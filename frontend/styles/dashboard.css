@@ -2,6 +2,8 @@ body {
   margin: 0;
   background: #fffdf9;
   font-family: 'Poppins', sans-serif;
+   overflow-y: auto;    /* ✅ allow vertical scroll */
+  overflow-x: hidden;
   color: #333;
 }
 
@@ -307,7 +309,7 @@ body {
 .cat {
   background: #fff;
   border-radius: 16px;
-  width: 150px;
+  width: 250px;
   /* similar width to vendor card */
   height: 180px;
   /* tall card */
@@ -372,23 +374,35 @@ body {
   color: #333;
 }
 
-/* ===== PROMO ===== */
+/* PROMO NEW STYLE (GREEN GRADIENT) */
 .promo-card {
+  margin: 15px 12px;
+  background: linear-gradient(135deg, #00c96c 0%, #00b050 100%);
+  padding: 18px;
+  border-radius: 18px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin: 15px 18px;
-  background: linear-gradient(90deg, #a06af9, #e7b6ff);
-  border-radius: 15px;
-  color: #fff;
-  padding: 15px 20px;
+  justify-content: space-between;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .promo-card img {
   width: 80px;
-  height: 80px;
-  object-fit: contain;
+  border-radius: 12px;
 }
+
+.promo-text h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.promo-text p {
+  margin: 3px 0 0;
+  font-size: 14px;
+}
+
 
 /* ===== VENDORS ===== */
 .vendor-card {
@@ -469,6 +483,41 @@ body {
   color: #555;
   font-size: 0.9rem;
 }
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: #fff;
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.menu-item img.item-img {
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.store-page {
+  padding: 16px;
+  padding-bottom: 90px;   /* leave room for bottom nav */
+  min-height: calc(100vh - 100px);
+  box-sizing: border-box;
+}
+.open-badge {
+  color: #00b050;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.closed-badge {
+  color: red;
+  font-weight: 600;
+  font-size: 14px;
+}
+
 
 /* ===== FOOTER NAV ===== */
 .footer-nav {

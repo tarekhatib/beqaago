@@ -1,65 +1,418 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title><%= vendorName %> | BeqaaGo</title>
-  <link rel="stylesheet" href="/styles/store.css" />
+  <meta charset="UTF-8">
+  <title><%= shopName %> | BeqaaGo</title>
+  <link rel="stylesheet" href="/styles/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
 
   <%- include("partials/header") %>
+<script>
+  // Fix cart badge inside store page
+  document.addEventListener("DOMContentLoaded", () => {
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const badge = document.getElementById("cart-count");
+    if (badge) badge.textContent = cart.reduce((s,i)=>s+(i.qty||1),0);
+  });
+</script>
 
   <main class="store-page">
+    <h1 class="store-title"><%= shopName %></h1>
+    <p class="location"><%= shopLocation %></p>
 
-    <div class="store-header">
-      <h1><%= vendorName %></h1>
-      <p class="location"><i class="fa-solid fa-location-dot"></i> <%= vendorLocation %></p>
-    </div>
-
-    <h2>Menu</h2>
-    <div id="menu-grid" class="menu-grid">Loading...</div>
-
+    <section>
+      <h2>Menu</h2>
+      <div id="menu-list" class="menu-list">Loading...</div>
+    </section>
   </main>
+
+  <!-- Floating cart bar -->
+  <div id="cart-bar" class="cart-bar hidden">
+    <span id="cart-bar-summary"></span>
+    <button class="cart-bar-btn" onclick="goToCart()">View cart</button>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Modal: new cart for different shop -->
+  <div id="cart-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Start a new cart?</h3>
+      <p>Your current cart belongs to another shop.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="modal-cancel">Cancel</button>
+        <button type="button" class="btn-primary" id="modal-confirm">Start New Cart</button>
+      </div>
+    </div>
+  </div>
 
   <%- include("partials/footer") %>
 
-<script>
-  async function loadMenu() {
-    const vendorId = <%= vendorId %>;
-    const grid = document.getElementById("menu-grid");
+  <script>
+    const shopId   = <%= shopId %>;
+    const isOpen   = <%= shopIsOpen %>;
+    const shopName = "<%= shopName %>";
+  </script>
 
+<script>
+
+  let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+  let pendingItem = null;
+
+  const menuList     = document.getElementById("menu-list");
+  const cartBar      = document.getElementById("cart-bar");
+  const cartBarSum   = document.getElementById("cart-bar-summary");
+  const toast        = document.getElementById("toast");
+  const modal        = document.getElementById("cart-modal");
+  const modalCancel  = document.getElementById("modal-cancel");
+  const modalConfirm = document.getElementById("modal-confirm");
+function updateHeaderCartCount() {
+  const badge = document.getElementById("cart-count");
+  if (badge) {
+    const qty = cart.reduce((s, i) => s + (i.qty || 1), 0);
+    badge.textContent = qty;
+  }
+}
+
+ document.addEventListener("DOMContentLoaded", () => {
+  loadMenu();
+  updateCartBar();
+  updateHeaderCartCount();   // 🔥 FIX
+
+  if (!isOpen) disableStoreActions();
+
+  modalCancel.addEventListener("click", hideModal);
+  modalConfirm.addEventListener("click", confirmSwitchCart);
+});
+
+
+  async function loadMenu() {
     try {
-      const res = await fetch(`/api/vendors/${vendorId}/menu`);
+      const res = await fetch(`/api/shops/${shopId}/items`);
       const items = await res.json();
 
       if (!items.length) {
-        grid.innerHTML = "<p>No menu items available.</p>";
+        menuList.innerHTML = "<p>No items yet.</p>";
         return;
       }
 
-      grid.innerHTML = items.map(i => `
-        <div class="menu-card">
-          <img src="${i.image || '/images/default-food.jpg'}">
-          <h3>${i.item_name}</h3>
-          <p>$${i.price}</p>
-          <button onclick='addToCart(${JSON.stringify(i)})'>Add to Cart</button>
+      menuList.innerHTML = items.map(i => `
+        <div class="menu-row">
+          <img 
+            src="${i.image || "/images/no-image.png"}"
+            class="item-img"
+            onerror="this.src='/images/no-image.png'"
+          />
+
+          <div class="item-info">
+            <h3>${i.name}</h3>
+            ${i.description ? `<p class="item-desc">${i.description}</p>` : ""}
+            <p class="price">$${Number(i.price).toFixed(2)}</p>
+          </div>
+
+          <button class="add-btn"
+            onclick='addToCart(${JSON.stringify({
+              id: i.id,
+              shop_id: shopId,
+              shopName: shopName,
+              name: i.name,
+              price: Number(i.price),
+              image: i.image
+            })})'>
+            Add
+          </button>
         </div>
       `).join("");
 
-    } catch (err) {
-      grid.innerHTML = "Failed to load menu.";
+    } catch(err) {
+      console.error(err);
+      menuList.innerHTML = "<p>Failed to load menu.</p>";
     }
   }
 
-  function addToCart(item) {
-    let cart = JSON.parse(localStorage.getItem("cart") || "[]");
-    cart.push(item);
-    localStorage.setItem("cart", JSON.stringify(cart));
-    alert("Added to cart!");
+ function addToCart(item) {
+  if (!isOpen) return;
+
+  // If switching shops
+  if (cart.length && cart[0].shop_id !== item.shop_id) {
+    pendingItem = item;
+    showModal();
+    return;
   }
 
-  loadMenu();
+  // ✅ check if item already exists
+  const existing = cart.find(i => i.id === item.id);
+
+  if (existing) {
+    existing.qty += 1;   // increase quantity
+  } else {
+    cart.push({ ...item, qty: 1 });
+  }
+
+ saveCart();
+updateCartBar();
+updateHeaderCartCount();   // 🔥 KEY FIX
+showToast(`${item.name} added to cart`);
+
+}
+
+  function confirmSwitchCart() {
+    cart = [{ ...pendingItem, qty: 1 }];
+    pendingItem = null;
+    saveCart();
+    updateCartBar();
+    hideModal();
+    showToast("Started a new cart");
+  }
+
+  function saveCart() {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }
+
+  function updateCartBar() {
+    if (!cart.length) return cartBar.classList.add("hidden");
+
+    const qty   = cart.reduce((s, i) => s + (i.qty || 1), 0);
+    const total = cart.reduce((s, i) => s + (i.qty || 1) * Number(i.price), 0);
+
+    cartBarSum.textContent = `${qty} item(s) • $${total.toFixed(2)}`;
+    cartBar.classList.remove("hidden");
+  }
+
+  function goToCart() {
+    window.location.href = "/cart";
+  }
+
+  function showModal() {
+    modal.classList.remove("hidden");
+  }
+
+  function hideModal() {
+    modal.classList.add("hidden");
+  }
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.remove("hidden");
+    toast.classList.add("show");
+
+    setTimeout(() => {
+      toast.classList.remove("show");
+      toast.classList.add("hidden");
+    }, 1400);
+  }
+
+  function disableStoreActions() {
+    const banner = document.createElement("div");
+    banner.className = "closed-banner";
+    banner.innerHTML = "This shop is currently CLOSED ❌";
+    document.querySelector(".store-page").prepend(banner);
+
+    setTimeout(() => {
+      document.querySelectorAll(".add-btn").forEach(btn => {
+        btn.disabled = true;
+        btn.style.background = "#ccc";
+        btn.style.cursor = "not-allowed";
+        btn.innerText = "Closed";
+      });
+    }, 300);
+  }
 </script>
+
+
+  <style>
+    .store-title {
+      margin-top: 10px;
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .menu-list {
+      margin-top: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-bottom: 90px; /* space for cart bar */
+    }
+
+    .menu-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fff;
+      padding: 12px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+    }
+
+    .item-img {
+      width: 75px;
+      height: 75px;
+      border-radius: 10px;
+      object-fit: cover;
+    }
+
+    .item-info {
+      flex: 1;
+      margin-left: 15px;
+    }
+
+    .item-info h3 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .item-info .item-desc {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: #777;
+    }
+
+    .item-info .price {
+      margin: 5px 0 0;
+      font-weight: 600;
+      color: #00b050;
+    }
+
+    .add-btn {
+      padding: 8px 16px;
+      background: #00b050;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.2s;
+      white-space: nowrap;
+    }
+
+    .add-btn:hover {
+      background: #009540;
+    }
+
+    .cart-bar {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 110px;
+      width: calc(100% - 40px);
+      max-width: 600px;
+      background: #fff;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      border-radius: 999px;
+      padding: 10px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 50;
+      font-size: 14px;
+    }
+    .cart-bar-btn {
+      border: none;
+      background: #00b050;
+      color: #fff;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .cart-bar.hidden {
+      display: none;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 100px;
+      background: #333;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+      z-index: 60;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-5px);
+      pointer-events: auto;
+    }
+    .toast.hidden {
+      display: none;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 70;
+    }
+    .modal-overlay.hidden {
+      display: none;
+    }
+    .modal {
+      background: #fff;
+      padding: 20px 22px;
+      border-radius: 16px;
+      max-width: 320px;
+      width: 90%;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+      text-align: left;
+      font-size: 14px;
+    }
+    .modal h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+    .modal p {
+      margin-top: 0;
+      margin-bottom: 16px;
+      color: #555;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .btn-secondary,
+    .btn-primary {
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-secondary {
+      background: #eee;
+      color: #333;
+    }
+    .btn-primary {
+      background: #00b050;
+      color: #fff;
+    }
+
+    .closed-banner {
+      background: #ffdddd;
+      border-left: 5px solid red;
+      padding: 12px;
+      margin-bottom: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #900;
+      border-radius: 8px;
+    }
+  </style>
 
 </body>
 </html>

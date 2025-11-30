@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <title>Your Cart | BeqaaGo</title>
-  <link rel="stylesheet" href="/styles/dashboard.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
   <%- include("partials/header") %>
@@ -15,93 +16,308 @@
     <p id="cart-empty" class="empty-cart">Your cart is empty.</p>
 
     <div class="cart-summary" id="cart-summary" style="display:none;">
+      <p class="cart-restaurant" id="cart-restaurant"></p>
       <p><strong>Total:</strong> $<span id="cart-total">0</span></p>
       <button id="checkout-btn">Place Order</button>
     </div>
   </main>
 
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
   <%- include("partials/footer") %>
 
 <script>
-  function loadCart() {
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-    const list = document.getElementById("cart-items");
-    const empty = document.getElementById("cart-empty");
-    const summary = document.getElementById("cart-summary");
-    const totalSpan = document.getElementById("cart-total");
+  const cartList = document.getElementById("cart-items");
+  const emptyMsg = document.getElementById("cart-empty");
+  const summaryBox = document.getElementById("cart-summary");
+  const totalSpan = document.getElementById("cart-total");
+  const restaurantLabel = document.getElementById("cart-restaurant");
+  const toastEl = document.getElementById("toast");
 
+  let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+  document.addEventListener("DOMContentLoaded", () => {
+    renderCart();
+  });
+
+  function saveCart() {
+    localStorage.setItem("cart", JSON.stringify(cart));
+    updateHeaderCartCount();
+  }
+
+  function updateHeaderCartCount() {
+    const badge = document.getElementById("cart-count");
+    if (!badge) return;
+    const totalQty = cart.reduce((sum, i) => sum + (i.qty || 0), 0);
+    badge.textContent = totalQty;
+  }
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.remove("hidden");
+    toastEl.classList.add("show");
+    setTimeout(() => {
+      toastEl.classList.remove("show");
+      toastEl.classList.add("hidden");
+    }, 2000);
+  }
+
+  function renderCart() {
     if (!cart.length) {
-      empty.style.display = "block";
-      summary.style.display = "none";
-      list.innerHTML = "";
+      cartList.innerHTML = "";
+      emptyMsg.style.display = "block";
+      summaryBox.style.display = "none";
+      totalSpan.textContent = "0.00";
       return;
     }
 
-    empty.style.display = "none";
-    summary.style.display = "block";
+    emptyMsg.style.display = "none";
+    summaryBox.style.display = "block";
+
+    const shopName = cart[0].shopName || "This shop";
+restaurantLabel.textContent = "From: " + shopName;
 
     let total = 0;
-    list.innerHTML = cart.map(item => {
-      const lineTotal = item.price * item.qty;
-      total += lineTotal;
-      return `
-        <div class="cart-item">
-          <div>
-            <strong>${item.name}</strong>
-            <p>$${item.price} x ${item.qty}</p>
+
+    cartList.innerHTML = cart
+      .map((item, idx) => {
+        const price = Number(item.price) || 0;
+        const qty = item.qty || 1;
+        const lineTotal = price * qty;
+        total += lineTotal;
+
+        return `
+          <div class="cart-item" data-index="${idx}">
+            <img
+              src="${item.image || "/images/no-image.png"}"
+              alt="${item.name}"
+              class="cart-item-img"
+              onerror="this.src='/images/no-image.png'"
+            />
+            <div class="cart-item-main">
+              <h3>${item.name}</h3>
+              <p class="cart-price">$${price.toFixed(2)}</p>
+            </div>
+            <div class="cart-qty-controls">
+              <button class="qty-btn minus">-</button>
+              <span class="qty">${qty}</span>
+              <button class="qty-btn plus">+</button>
+            </div>
+            <div class="cart-line-total">$${lineTotal.toFixed(2)}</div>
+            <button class="remove-btn">&times;</button>
           </div>
-          <div>$${lineTotal.toFixed(2)}</div>
-        </div>`;
-    }).join("");
+        `;
+      })
+      .join("");
 
     totalSpan.textContent = total.toFixed(2);
+    saveCart();
   }
 
+  // Event delegation for + / - / remove
+  cartList.addEventListener("click", (e) => {
+    const itemEl = e.target.closest(".cart-item");
+    if (!itemEl) return;
+    const idx = Number(itemEl.getAttribute("data-index"));
+    if (Number.isNaN(idx)) return;
+
+    if (e.target.classList.contains("plus")) {
+      cart[idx].qty = (cart[idx].qty || 1) + 1;
+      renderCart();
+    } else if (e.target.classList.contains("minus")) {
+      const current = cart[idx].qty || 1;
+      if (current > 1) {
+        cart[idx].qty = current - 1;
+      } else {
+        cart.splice(idx, 1);
+      }
+      renderCart();
+    } else if (e.target.classList.contains("remove-btn")) {
+      cart.splice(idx, 1);
+      renderCart();
+    }
+  });
+
   async function checkout() {
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    cart = JSON.parse(localStorage.getItem("cart") || "[]");
     const user = JSON.parse(localStorage.getItem("user") || "{}");
 
     if (!user.id) {
-      alert("You must be logged in.");
-      window.location.href = "/login";
-      return;
-    }
-    if (!cart.length) {
-      alert("Cart is empty.");
+      showToast("Please log in first.");
       return;
     }
 
-    const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-    const vendor_id = cart[0].vendor_id;
+    if (!cart.length) {
+      showToast("Cart is empty.");
+      return;
+    }
+
+    const total = cart.reduce(
+      (sum, i) => sum + (Number(i.price) || 0) * (i.qty || 0),
+      0
+    );
+    const shopId = cart[0].shop_id;
 
     try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: user.id,
-          vendor_id,
-          total,
-        }),
-      });
+      
+
+const res = await fetch("/api/orders", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    user_id: user.id,
+    shop_id: shopId,
+    total,
+    status: "Pending",
+    items: cart,
+  }),
+});
+
 
       const data = await res.json();
       if (res.ok) {
-        alert("✅ Order placed!");
         localStorage.removeItem("cart");
-        window.location.href = "/orders";
+        cart = [];
+        renderCart();
+        showToast("Order placed!");
+        setTimeout(() => {
+          window.location.href = "/orders";
+        }, 800);
       } else {
-        alert("❌ " + (data.message || "Order failed"));
+        showToast(data.message || "Order failed.");
       }
     } catch (err) {
       console.error(err);
-      alert("Server error");
+      showToast("Server error.");
     }
   }
 
   document.getElementById("checkout-btn").addEventListener("click", checkout);
-  loadCart();
 </script>
+
+<style>
+  .cart-page {
+    padding-bottom: 80px;
+  }
+
+  .cart-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    margin-bottom: 10px;
+  }
+
+  .cart-item-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    object-fit: cover;
+  }
+
+  .cart-item-main {
+    flex: 1;
+  }
+
+  .cart-item-main h3 {
+    margin: 0;
+    font-size: 16px;
+  }
+
+  .cart-price {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: #00b050;
+  }
+
+  .cart-qty-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .qty-btn {
+    border: none;
+    background: #f0f0f0;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .cart-line-total {
+    width: 70px;
+    text-align: right;
+    font-weight: 600;
+  }
+
+  .remove-btn {
+    border: none;
+    background: transparent;
+    font-size: 20px;
+    color: #999;
+    cursor: pointer;
+  }
+
+  .cart-summary {
+    background: #fff;
+    padding: 16px;
+    margin-top: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  }
+
+  .cart-restaurant {
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: #666;
+  }
+
+  #checkout-btn {
+    margin-top: 10px;
+    width: 100%;
+    border: none;
+    background: #00b050;
+    color: #fff;
+    padding: 10px 0;
+    border-radius: 10px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .empty-cart {
+    color: #777;
+  }
+
+  /* Reuse toast styles from store page */
+  .toast {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 100px;
+    background: #333;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+    z-index: 60;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-5px);
+  }
+  .toast.hidden {
+    display: none;
+  }
+</style>
 
 </body>
 </html>

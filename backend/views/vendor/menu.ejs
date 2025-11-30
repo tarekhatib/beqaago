@@ -5,6 +5,7 @@
   <title>Vendor Menu | BeqaaGo</title>
   <link rel="stylesheet" href="/styles/vendor.css">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />  
 </head>
 <body>
 
@@ -21,15 +22,17 @@
   </aside>
 
   <main class="main">
-    <h1>Your Menu</h1>
+    <h1>Your Menu / Items</h1>
 
     <section>
       <h2>Add New Item</h2>
       <form id="menu-form">
         <input type="text" id="item-name" placeholder="Item name" required />
+        <input type="text" id="item-desc" placeholder="Description (optional)" />
         <input type="number" id="item-price" placeholder="Price" step="0.01" required />
         <input type="text" id="item-image" placeholder="Image URL (optional)" />
         <button type="submit">Add Item</button>
+        <p id="menu-msg" style="margin-top:8px;font-size:0.9rem;"></p>
       </form>
     </section>
 
@@ -47,46 +50,41 @@
     window.location.href = "/login";
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    loadMenu();
+  let shopId = null;
 
-    document.getElementById("menu-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const vendor = JSON.parse(localStorage.getItem("user") || "{}");
-      if (!vendor.id) return alert("Not logged in");
+  document.addEventListener("DOMContentLoaded", initVendorMenu);
 
-      const item_name = document.getElementById("item-name").value.trim();
-      const price = document.getElementById("item-price").value;
-      const image = document.getElementById("item-image").value.trim();
+  async function initVendorMenu() {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!user.id || user.role !== "vendor") {
+      window.location.href = "/login";
+      return;
+    }
 
-      try {
-        const res = await fetch(`/api/vendors/${vendor.id}/menu`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ item_name, price, image }),
-        });
+    // Get vendor shop
+    const res = await fetch(`/api/shops/owner/${user.id}`);
+    const shop = await res.json();
 
-        const data = await res.json();
-        alert(data.message || "Added");
-        loadMenu();
-        e.target.reset();
-      } catch (err) {
-        console.error(err);
-        alert("Error adding item");
-      }
-    });
-  });
+    if (!shop.id) {
+      return window.location.href = "/vendor/create-shop";
+    }
+
+    shopId = shop.id;
+
+    await loadMenu();
+
+    document.getElementById("menu-form").addEventListener("submit", submitMenuForm);
+  }
 
   async function loadMenu() {
-    const vendor = JSON.parse(localStorage.getItem("user") || "{}");
     const list = document.getElementById("menu-list");
-    if (!vendor.id) {
-      list.innerHTML = "Not logged in.";
+    if (!shopId) {
+      list.innerHTML = "No shop configured.";
       return;
     }
 
     try {
-      const res = await fetch(`/api/vendors/${vendor.id}/menu`);
+      const res = await fetch(`/api/shops/${shopId}/items`);
       const items = await res.json();
 
       if (!items.length) {
@@ -94,14 +92,65 @@
         return;
       }
 
-      list.innerHTML = items.map(i => `
-        <div class="menu-item">
-          <strong>${i.item_name}</strong> - $${i.price}
-        </div>
-      `).join("");
+      list.innerHTML = items
+        .map(i => `
+          <div class="menu-item">
+            <div>
+              <strong>${i.name}</strong> - $${Number(i.price).toFixed(2)}<br/>
+              ${i.description ? `<small>${i.description}</small>` : ""}
+            </div>
+          </div>
+        `)
+        .join("");
     } catch (err) {
       console.error(err);
       list.innerHTML = "Failed to load menu.";
+    }
+  }
+
+  async function submitMenuForm(e) {
+    e.preventDefault();
+    const msg = document.getElementById("menu-msg");
+
+    if (!shopId) {
+      msg.style.color = "red";
+      msg.textContent = "No shop found.";
+      return;
+    }
+
+    const name = document.getElementById("item-name").value.trim();
+    const description = document.getElementById("item-desc").value.trim();
+    const price = document.getElementById("item-price").value;
+    const image = document.getElementById("item-image").value.trim();
+
+    if (!name || !price) {
+      msg.style.color = "red";
+      msg.textContent = "Name and price are required.";
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/shops/${shopId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description, price, image })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        msg.style.color = "#00b050";
+        msg.textContent = data.message || "Added";
+        e.target.reset();
+        loadMenu();
+      } else {
+        msg.style.color = "red";
+        msg.textContent = data.message || "Failed.";
+      }
+    } catch (err) {
+      console.error(err);
+      msg.style.color = "red";
+      msg.textContent = "Error adding item.";
     }
   }
 </script>

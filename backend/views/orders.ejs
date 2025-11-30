@@ -5,64 +5,147 @@
   <title>Your Orders | BeqaaGo</title>
   <link rel="stylesheet" href="/styles/dashboard.css">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
- <link
-  rel="stylesheet"
-  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 
 <body>
-  <%- include("partials/header") %>
+<%- include("partials/header") %>
 
-  <main class="orders-page">
-    <h1>🧾 Your Orders</h1>
-    <div id="orders-list"></div>
-    <p id="no-orders" class="empty-cart">No previous orders yet 🍕</p>
-  </main>
+<main class="orders-page">
+  <h1>Your Orders</h1>
 
-  <%- include("partials/footer") %>
+  <div id="orders-list">Loading...</div>
+</main>
 
-  <script>
+<%- include("partials/footer") %>
+
+<script>
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  if (!user.id) {
+    alert("Please log in first.");
+    window.location.href = "/login";
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    loadOrders();
+    setInterval(loadOrders, 10000); // 🔄 auto-refresh every 10 seconds
+  });
+
   async function loadOrders() {
-    const token = localStorage.getItem("token");
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
     const list = document.getElementById("orders-list");
-    const empty = document.getElementById("no-orders");
-
-    if (!user.id) {
-      empty.innerText = "⚠️ Please log in to view your orders.";
-      empty.style.display = "block";
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/orders/${user.id}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const res = await fetch(`/api/orders/${user.id}`);
       const orders = await res.json();
 
-      if (!Array.isArray(orders) || orders.length === 0) {
-        empty.style.display = "block";
-      } else {
-        empty.style.display = "none";
-        list.innerHTML = orders.map(o => `
-          <div class="order-card">
-            <h3>${o.restaurant}</h3>
-            <p>${new Date(o.created_at).toLocaleString()}</p>
-            <p><strong>Total:</strong> $${o.total}</p>
-            <span class="status ${o.status.toLowerCase()}">${o.status}</span>
-          </div>
-        `).join("");
+      if (!orders.length) {
+        list.innerHTML = "<p>You have no orders yet.</p>";
+        return;
       }
+
+      list.innerHTML = orders.map(renderOrderCard).join("");
+
     } catch (err) {
       console.error(err);
-      empty.innerText = "⚠️ Failed to load orders.";
-      empty.style.display = "block";
+      list.innerHTML = "<p>Failed to load orders.</p>";
     }
   }
 
-  loadOrders();
+  function renderOrderCard(order) {
+    const statusColors = {
+      "Pending": "#ffcc00",
+      "Preparing": "#00b7ff",
+      "Delivered": "#00b050"
+    };
+
+    return `
+      <div class="order-card">
+        <div class="order-row">
+          <div>
+           <h3>Order #${order.id}</h3>
+<p>${order.shop_name}</p>
+
+<p class="order-date">${new Date(order.created_at).toLocaleString()}</p>
+<p><strong>Total:</strong> $${order.total}</p>
+    <p><strong>Status:</strong> 
+              <span style="color:${statusColors[order.status]};font-weight:600;">
+                ${order.status}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Small progress bar -->
+        <div class="progress-container">
+          <div class="progress-bar" style="width:${getProgress(order.status)}%"></div>
+        </div>
+
+        <p class="progress-label">${getProgressLabel(order.status)}</p>
+      </div>
+    `;
+  }
+
+  function getProgress(status) {
+    if (status === "Pending") return 33;
+    if (status === "Preparing") return 66;
+    if (status === "Delivered") return 100;
+    return 0;
+  }
+
+  function getProgressLabel(status) {
+    if (status === "Pending") return "Pending (0–1 min)";
+    if (status === "Preparing") return "Preparing (1–2 min)";
+    if (status === "Delivered") return "Delivered ✔";
+    return "";
+  }
 </script>
+
+<style>
+  /* Matches your dashboard style exactly */
+
+  .orders-page {
+    padding: 20px;
+  padding-bottom: 90px;   /* leave room for bottom nav */
+  min-height: calc(100vh - 100px);
+  box-sizing: border-box;
+}
+  
+
+  .order-card {
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 7px rgba(0,0,0,0.08);
+    margin-bottom: 15px;
+  }
+
+  .progress-container {
+    width: 100%;
+    height: 6px;              /* 🔹 small bar */
+    background: #eee;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: #00b050;
+    transition: width 0.5s;
+  }
+
+  .progress-label {
+    font-size: 12px;
+    margin-top: 5px;
+    color: #666;
+  }
+  .order-date {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+</style>
 
 </body>
 </html>

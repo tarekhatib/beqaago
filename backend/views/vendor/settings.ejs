@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Vendor Settings | BeqaaGo</title>
+  <link rel="stylesheet" href="/styles/vendor.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+
+<body>
+
+<div class="vendor-container">
+
+  <aside class="sidebar">
+    <h2 class="brand">BeqaaGo Vendor</h2>
+
+    <nav>
+      <a href="/vendor/dashboard">
+        <i class="fa-solid fa-chart-line"></i> Dashboard
+      </a>
+
+      <a href="/vendor/menu">
+        <i class="fa-solid fa-utensils"></i> Menu Items
+      </a>
+
+      <a href="/vendor/orders">
+        <i class="fa-solid fa-clipboard-list"></i> Orders
+      </a>
+
+      <a href="/vendor/settings" class="active">
+        <i class="fa-solid fa-gear"></i> Settings
+      </a>
+
+      <a class="logout" onclick="vendorLogout()">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <h1>Settings</h1>
+
+    <!-- SHOP INFO -->
+    <section>
+      <h2>Shop Information</h2>
+
+      <form id="shop-form">
+        <input type="text" id="shop-name" placeholder="Shop Name" required>
+        <input type="text" id="shop-type" placeholder="Type (restaurant, shop...)" required>
+        <input type="text" id="shop-phone" placeholder="Phone" required>
+        <input type="text" id="shop-location" placeholder="Location" required>
+        <input type="text" id="shop-image" placeholder="Image URL" required>
+        <button type="submit">Save Shop</button>
+        <p id="shop-save-msg" style="margin-top:8px;font-size:0.9rem;color:#00b050;"></p>
+      </form>
+    </section>
+
+    <!-- AVAILABILITY -->
+    <section style="margin-top:30px;">
+      <h2>Availability</h2>
+      <label class="switch">
+        <input type="checkbox" id="availability-toggle">
+        <span class="slider"></span>
+      </label>
+      <p id="avail-text" style="margin-top:8px;font-weight:600;"></p>
+      <p id="avail-save-msg" style="margin-top:4px;font-size:0.9rem;color:#00b050;"></p>
+    </section>
+
+    <!-- ACCOUNT (UI ONLY) -->
+    <section style="margin-top:30px;">
+      <h2>Account Settings</h2>
+
+      <form id="account-form">
+        <input type="text" id="vendor-name" placeholder="Your Name" required>
+        <input type="email" id="vendor-email" placeholder="Your Email" required>
+        <input type="password" id="vendor-pass" placeholder="New Password (Optional)">
+        <button type="submit">Update Account</button>
+        <p id="account-msg" style="margin-top:8px;font-size:0.9rem;color:#999;"></p>
+      </form>
+    </section>
+
+  </main>
+</div>
+
+<script>
+function vendorLogout() {
+  localStorage.removeItem("user");
+  localStorage.removeItem("token");
+  window.location.href = "/login";
+}
+
+document.addEventListener("DOMContentLoaded", initSettings);
+
+async function initSettings() {
+  const vendor = JSON.parse(localStorage.getItem("user") || "{}");
+
+  if (!vendor.id || vendor.role !== "vendor") {
+    return (window.location.href = "/login");
+  }
+
+  document.getElementById("vendor-name").value = vendor.name || "";
+  document.getElementById("vendor-email").value = vendor.email || "";
+
+  const res = await fetch(`/api/shops/owner/${vendor.id}`);
+  const shop = await res.json();
+
+  if (!shop || !shop.id) {
+    return (window.location.href = "/vendor/create-shop");
+  }
+
+  document.getElementById("shop-name").value     = shop.name        || "";
+  document.getElementById("shop-type").value     = shop.type        || "restaurant";
+  document.getElementById("shop-phone").value    = shop.phone       || "";
+  document.getElementById("shop-location").value = shop.location    || "";
+  document.getElementById("shop-image").value    = shop.image       || "";
+  document.getElementById("availability-toggle").checked = shop.is_open == 1;
+  document.getElementById("avail-text").innerText = shop.is_open ? "Open" : "Closed";
+
+  // Availability
+  document.getElementById("availability-toggle").addEventListener("change", async (e) => {
+    const is_open = e.target.checked ? 1 : 0;
+
+    try {
+      const res = await fetch(`/api/shops/owner/${vendor.id}/availability`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_open })
+      });
+
+      if (!res.ok) throw new Error("Failed to update availability");
+
+      document.getElementById("avail-text").innerText = is_open ? "Open" : "Closed";
+      const msg = document.getElementById("avail-save-msg");
+      msg.textContent = "Availability updated";
+      setTimeout(() => (msg.textContent = ""), 1500);
+
+    } catch (err) {
+      console.error(err);
+      e.target.checked = !e.target.checked;
+      alert("Failed to update availability.");
+    }
+  });
+
+  // Save shop info
+  document.getElementById("shop-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const name     = document.getElementById("shop-name").value.trim();
+    const type     = document.getElementById("shop-type").value.trim();
+    const phone    = document.getElementById("shop-phone").value.trim();
+    const location = document.getElementById("shop-location").value.trim();
+    const image    = document.getElementById("shop-image").value.trim();
+
+    if (!name || !type || !phone || !location || !image) return;
+
+    try {
+      const res = await fetch(`/api/shops/owner/${vendor.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, type, phone, location, image })
+      });
+
+      if (!res.ok) throw new Error("Failed to save");
+
+      const msg = document.getElementById("shop-save-msg");
+      msg.textContent = "Shop saved!";
+      setTimeout(() => (msg.textContent = ""), 1500);
+
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save shop.");
+    }
+  });
+
+  // Account form (UI only)
+  document.getElementById("account-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("account-msg");
+    msg.textContent = "Account update endpoint not implemented.";
+    setTimeout(() => (msg.textContent = ""), 2000);
+  });
+}
+</script>
+
+</body>
+</html>

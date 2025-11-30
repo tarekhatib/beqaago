@@ -3,17 +3,35 @@ body {
   font-family: "Poppins", sans-serif;
   background: #f8f8f8;
 }
-
 .vendor-container {
   display: flex;
 }
 
+.main {
+  flex: 1;
+  padding: 30px;
+  margin-left: 230px; /* pushes main content so it doesn't go under sidebar */
+}
+
 .sidebar {
-  width: 230px;
+  width: 200px;
   background: #ffffff;
-  height: 100vh;
+  position: fixed;       /* stays in place */
+  top: 0;
+  left: 0;
+  height: 100vh;         /* full height */
+  overflow-y: auto;      /* allows sidebar scrolling if content is tall */
   padding: 20px;
   box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: #ddd;
+  border-radius: 10px;
 }
 
 .sidebar .brand {
@@ -44,10 +62,7 @@ body {
   color: white;
 }
 
-.main {
-  flex: 1;
-  padding: 30px;
-}
+
 
 .stats {
   display: flex;
@@ -78,4 +93,28 @@ body {
   margin-bottom: 10px;
   border-radius: 10px;
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+.view-all-btn {
+  display: inline-block;
+  margin-top: 10px;
+  color: #00b050;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.view-all-btn:hover {
+  text-decoration: underline;
+}
+
+.order-preview {
+  background: white;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.order-preview .time {
+  font-size: 12px;
+  color: #666;
 }

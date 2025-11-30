@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Your Orders | Vendor</title>
+  <link rel="stylesheet" href="/styles/vendor.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+
+<div class="vendor-container">
+
+  <aside class="sidebar">
+    <h2 class="brand">BeqaaGo Vendor</h2>
+
+    <nav>
+      <a href="/vendor/dashboard">
+        <i class="fa-solid fa-chart-line"></i> Dashboard
+      </a>
+
+      <a href="/vendor/menu">
+        <i class="fa-solid fa-utensils"></i> Menu Items
+      </a>
+
+      <a href="/vendor/orders" class="active">
+        <i class="fa-solid fa-clipboard-list"></i> Orders
+      </a>
+
+      <a href="/vendor/settings">
+        <i class="fa-solid fa-gear"></i> Settings
+      </a>
+
+      <a href="#" onclick="vendorLogout()" class="logout">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <h1>Your Orders</h1>
+    <div id="order-list">Loading...</div>
+  </main>
+
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", loadVendorOrders);
+
+  async function loadVendorOrders() {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!user.id || user.role !== "vendor") {
+      return window.location.href = "/login";
+    }
+
+    const res = await fetch(`/api/orders/vendor/${user.id}`);
+    const orders = await res.json();
+
+    const list = document.getElementById("order-list");
+
+    if (!orders.length) {
+      list.innerHTML = "<p>No orders yet.</p>";
+      return;
+    }
+
+    list.innerHTML = orders
+      .map(o => `
+        <div class="order-card">
+          <strong>Order #${o.id}</strong>
+          <p><b>Total:</b> $${Number(o.total).toFixed(2)}</p>
+          <p><b>Status:</b> ${statusColor(o.status)}</p>
+          <p><b>Customer:</b> ${o.customer}</p>
+          <p><b>Time:</b> ${new Date(o.created_at).toLocaleString()}</p>
+        </div>
+      `)
+      .join("");
+  }
+
+  function statusColor(s) {
+    if (s === "Delivered") return `<span style="color:green">${s}</span>`;
+    if (s === "Preparing") return `<span style="color:#ff9800">${s}</span>`;
+    return `<span style="color:red">${s}</span>`;
+  }
+
+  function vendorLogout() {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  }
+</script>
+
+</body>
+</html>

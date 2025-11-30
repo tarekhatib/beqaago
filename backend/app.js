@@ -1,10 +1,12 @@
+// backend/app.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { getVendorById } from "./models/vendor.model.js";
+// Models
+import { getShopById } from "./models/shop.model.js";
 
 // Proper __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -13,7 +15,6 @@ const __dirname = path.dirname(__filename);
 // Load backend .env
 dotenv.config({ path: path.join(__dirname, ".env") });
 
-// Debug env
 console.log("Loaded env variables:");
 console.log("DB_HOST:", process.env.DB_HOST);
 console.log("DB_USER:", process.env.DB_USER);
@@ -23,9 +24,8 @@ console.log("DB_NAME:", process.env.DB_NAME);
 // ROUTES
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
-import vendorRoutes from "./routes/vendor.routes.js";
+import shopRoutes from "./routes/shop.routes.js";
 import orderRoutes from "./routes/order.routes.js";
-import vendorMenuRoutes from "./routes/vendorMenu.routes.js";
 
 const app = express();
 
@@ -40,13 +40,12 @@ app.set("views", path.join(__dirname, "views"));
 // Serve frontend
 app.use(express.static(path.join(__dirname, "../frontend")));
 
-
 // ============================
 // USER PAGES
 // ============================
-app.get("/", (req, res) => res.render("index"));
-app.get("/login", (req, res) => res.render("login"));
-app.get("/register", (req, res) => res.render("register"));
+app.get("/", (req, res) => res.render("index", { page: "home" }));
+app.get("/login", (req, res) => res.render("login", { page: "login" }));
+app.get("/register", (req, res) => res.render("register", { page: "register" }));
 
 app.get("/dashboard", (req, res) =>
   res.render("dashboard", { page: "dashboard" })
@@ -65,9 +64,22 @@ app.get("/account", (req, res) =>
 );
 
 app.get("/cart", (req, res) =>
-  res.render("cart", { page: "" })
+  res.render("cart", { page: "cart" })
 );
 
+// Store page (user clicks on shop card)
+app.get("/store/:id", async (req, res) => {
+  const shop = await getShopById(req.params.id);
+  if (!shop) return res.status(404).send("Shop not found");
+
+  res.render("store", {
+    page: "store",
+    shopId: shop.id,
+    shopName: shop.name,
+    shopLocation: shop.location || "Beqaa",
+    shopIsOpen: shop.is_open || 0
+  });
+});
 
 // ============================
 // VENDOR PAGES
@@ -88,37 +100,17 @@ app.get("/vendor/settings", (req, res) =>
   res.render("vendor/settings", { page: "vendor-settings" })
 );
 
-
-// ============================
-// STORE PAGE (When user opens a restaurant)
-// ============================
-app.get("/store/:id", async (req, res) => {
-  const vendor = await getVendorById(req.params.id);
-  if (!vendor) return res.status(404).send("Vendor not found");
-
-  res.render("store", {
-    page: "",
-    vendorId: vendor.id,
-    vendorName: vendor.name,
-    vendorLocation: vendor.location || "Beqaa",
-  });
-});
-
+app.get("/vendor/create-shop", (req, res) =>
+  res.render("vendor/create-shop", { page: "vendor-create-shop" })
+);
 
 // ============================
 // API ROUTES
 // ============================
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-
-// vendor info routes
-app.use("/api/vendors", vendorRoutes);
-
-// vendor menu routes — MUST BE SEPARATE
-app.use("/api/vendors", vendorMenuRoutes);
-
+app.use("/api/shops", shopRoutes);
 app.use("/api/orders", orderRoutes);
-
 
 // 404
 app.use((req, res) => res.status(404).send("404 - Page Not Found"));

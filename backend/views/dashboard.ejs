@@ -10,116 +10,163 @@
 </head>
 
 <body>
+  <%- include("partials/header") %>
+  
+  <!-- Update cart icon count -->
+ <script>
+  function updateHeaderCartCount() {
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const badge = document.getElementById("cart-count");
 
-  <body>
-    <%- include("partials/header") %>
-      <script>
-        // Update cart count badge
-        const items = JSON.parse(localStorage.getItem("cart") || "[]");
-        document.getElementById("cart-count").textContent = items.length;
-      </script>
+    if (!badge) return;
+
+    const qty = cart.reduce((sum, item) => sum + (item.qty || 1), 0);
+    badge.textContent = qty;
+  }
+
+  // Auto-run immediately when header loads
+  document.addEventListener("DOMContentLoaded", updateHeaderCartCount);
+</script>
 
 
-      <!-- SEARCH -->
-      <div class="search-bar">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" id="search" placeholder="Search 'Fast Food'">
-        <i class="fa-solid fa-sliders"></i>
-      </div>
+  <!-- SEARCH -->
+  <div class="search-bar">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" id="search" placeholder="Search 'Fast Food'">
+    <i class="fa-solid fa-sliders"></i>
+  </div>
 
-      <!-- PROMO -->
-      <div class="promo-card">
-        <div class="promo-text">
-          <h3>🎉 Free Delivery</h3>
-          <p>On your first 3 orders</p>
-        </div>
-        <img src="/images/promo.avif" alt="Promo">
-      </div>
+  <!-- PROMO -->
+  <div class="promo-card">
+    <div class="promo-text">
+      <h3>🎉 Free Delivery</h3>
+      <p>On your first 3 orders</p>
+    </div>
+    <img src="/images/promo.avif" alt="Promo">
+  </div>
 
-      <!-- CATEGORIES (Only for Dashboard) -->
-      <section class="categories">
-        <div class="cat active"><img src="/images/icons/all.png">
-          <p>All</p>
-        </div>
-        <div class="cat"><img src="/images/icons/food.jpg">
-          <p>Food</p>
-        </div>
-        <div class="cat"><img src="/images/icons/fresh.webp">
-          <p>Fresh</p>
-        </div>
-        <div class="cat"><img src="/images/icons/skincare.avif">
-          <p>Beauty</p>
-        </div>
-        <div class="cat"><img src="/images/icons/shop.jpg">
-          <p>Shops</p>
-        </div>
-      </section>
-      <!-- VENDORS -->
-      <section class="vendors">
-        <h2>Nearby Restaurants 🍴</h2>
-        <div id="vendor-grid" class="vendor-grid">Loading vendors...</div>
-      </section>
+  <!-- CATEGORIES -->
+  <section class="categories">
+    <div class="cat active"><img src="/images/icons/all.png"><p>All</p></div>
+    <div class="cat"><img src="/images/icons/food.jpg"><p>Food</p></div>
+    <div class="cat"><img src="/images/icons/fresh.webp"><p>Fresh</p></div>
+    <div class="cat"><img src="/images/icons/skincare.avif"><p>Beauty</p></div>
+    <div class="cat"><img src="/images/icons/shop.jpg"><p>Shops</p></div>
+  </section>
 
-      <%- include("partials/footer") %>
+  <!-- SHOPS -->
+  <section class="vendors">
+    <h2>Nearby Shops 🛍️</h2>
+    <div id="shop-grid" class="vendor-grid">Loading shops...</div>
+  </section>
 
-        <script>
-          async function loadVendors() {
-            const grid = document.getElementById("vendor-grid");
-            try {
-              const res = await fetch("/api/vendors");
-              const vendors = await res.json();
+  <%- include("partials/footer") %>
 
-             grid.innerHTML = vendors.length
-  ? vendors.map(v => `
-      <div class="vendor-card" onclick="openStore(${v.id})">
-        <img src="${v.image}" alt="${v.name}">
+  <script>
+  let allShops = [];
+
+  document.addEventListener("DOMContentLoaded", () => {
+    loadShops();
+    setupCategoryFilters();
+  });
+
+  async function loadShops() {
+    const grid = document.getElementById("shop-grid");
+
+    try {
+      const res = await fetch("/api/shops");
+      allShops = await res.json();
+
+      renderShops(allShops);
+    } catch (err) {
+      console.error(err);
+      grid.innerHTML = "<p>⚠️ Failed to load shops.</p>";
+    }
+  }
+
+  function renderShops(list) {
+    const grid = document.getElementById("shop-grid");
+
+    if (!list.length) {
+      grid.innerHTML = "<p>No shops available.</p>";
+      return;
+    }
+
+    grid.innerHTML = list.map(s => `
+      <div class="vendor-card" onclick="openStore(${s.id})">
+
+        <img src="${s.image}" alt="${s.name}">
+
         <div class="info">
-          <h3>${v.name}</h3>
-          <p>${v.location || "Beqaa"}</p>
+          <h3>${s.name}</h3>
+          <p>${s.location || "Beqaa"}</p>
+
+          ${s.is_open
+            ? `<span class="open-badge">Open</span>`
+            : `<span class="closed-badge">Not Available Right Now</span>`}
         </div>
+
       </div>
-    `).join("")
-  : "<p>No vendors available yet.</p>";
+    `).join("");
+  }
 
-            } catch (err) {
-              grid.innerHTML = "<p>⚠️ Failed to load vendors.</p>";
-            }
-          }
+  function setupCategoryFilters() {
+    const cats = document.querySelectorAll(".cat");
+    cats.forEach(cat => {
+      cat.addEventListener("click", () => {
+        document.querySelector(".cat.active")?.classList.remove("active");
+        cat.classList.add("active");
 
-          function openLocation() {
-            if (!navigator.geolocation) {
-              alert("Geolocation not supported on this device.");
-              return;
-            }
+        const label = cat.querySelector("p").innerText;
 
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-              const { latitude, longitude } = pos.coords;
+        filterShops(label);
+      });
+    });
+  }
 
-              try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-                const data = await res.json();
-                document.getElementById("user-address").innerText =
-                  data.address.city || data.address.town || "Beqaa";
-              } catch {
-                document.getElementById("user-address").innerText = "Location found";
-              }
-            }, (err) => {
-              alert("Please enable location permissions.");
-              document.getElementById("user-address").innerText = "Location Off";
-            });
-          }
+  function filterShops(category) {
+    if (category === "All") return renderShops(allShops);
 
-          function openCart() {
-            alert("🛒 Your cart is currently empty!");
-          }
+    if (category === "Food")
+      return renderShops(allShops.filter(s => s.type === "restaurant"));
 
-          loadVendors();
-          openLocation();
-          function openStore(vendorId) {
-  window.location.href = `/store/${vendorId}`;
-}
+    if (category === "Fresh")
+      return renderShops(allShops.filter(s => s.type === "fresh"));
 
-        </script>
-  </body>
+    if (category === "Beauty")
+      return renderShops(allShops.filter(s => s.type === "beauty"));
 
+    if (category === "Shops")
+      return renderShops(allShops.filter(s => s.type === "shop" || s.type === "market"));
+  }
+
+  function openStore(id) {
+    window.location.href = `/store/${id}`;
+  }
+
+  function openLocation() {
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude, longitude } = pos.coords;
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+        );
+        const data = await res.json();
+        document.getElementById("user-address").innerText =
+          data.address.city || data.address.town || "Beqaa";
+      } catch {
+        document.getElementById("user-address").innerText = "Location found";
+      }
+    },
+      () => { document.getElementById("user-address").innerText = "Location Off"; }
+    );
+  }
+
+  openLocation();
+</script>
+
+
+</body>
 </html>

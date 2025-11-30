@@ -5,64 +5,72 @@
   <title>Search | BeqaaGo</title>
   <link rel="stylesheet" href="/styles/dashboard.css">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
- <link
-  rel="stylesheet"
-  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 
 <body>
   <%- include("partials/header") %>
 
   <main class="search-page">
-    <h1>🔍 Search Restaurants or Shops</h1>
+    <h1>🔍 Search Shops & Places</h1>
+
     <div class="search-bar">
       <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" id="search-input" placeholder="Search for food or places..." oninput="searchVendors()">
+      <input type="text" id="search-input" placeholder="Search for food or shops..." oninput="searchShops()">
     </div>
 
     <div id="search-results" class="vendor-grid"></div>
-    <p id="no-results" class="empty-cart">Start typing to find places 🍔</p>
+    <p id="no-results" class="empty-cart">Start typing to find shops 🛍️</p>
   </main>
 
   <%- include("partials/footer") %>
 
-  <script>
-    async function searchVendors() {
-      const query = document.getElementById("search-input").value.trim();
-      const resultsDiv = document.getElementById("search-results");
-      const noResults = document.getElementById("no-results");
+<script>
+  async function searchShops() {
+    const query = document.getElementById("search-input").value.trim();
+    const resultsDiv = document.getElementById("search-results");
+    const noResults = document.getElementById("no-results");
 
-      if (!query) {
-        resultsDiv.innerHTML = "";
-        noResults.style.display = "block";
-        return;
-      }
-
-      try {
-        const res = await fetch(`/api/vendors/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-
-        if (data.length === 0) {
-          resultsDiv.innerHTML = "";
-          noResults.innerText = "No matches found ❌";
-          noResults.style.display = "block";
-        } else {
-          noResults.style.display = "none";
-          resultsDiv.innerHTML = data.map(v => `
-            <div class="vendor-card">
-              <img src="/images/vendor.jpg" alt="${v.name}">
-              <div class="info">
-                <h3>${v.name}</h3>
-                <p>${v.location}</p>
-              </div>
-            </div>
-          `).join("");
-        }
-      } catch (err) {
-        resultsDiv.innerHTML = "<p>⚠️ Failed to fetch results.</p>";
-      }
+    if (!query) {
+      resultsDiv.innerHTML = "";
+      noResults.style.display = "block";
+      noResults.innerText = "Start typing to find shops 🛍️";
+      return;
     }
-  </script>
+
+    try {
+      const res = await fetch(`/api/shops/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+
+      if (data.length === 0) {
+        resultsDiv.innerHTML = "";
+        noResults.innerText = "No matches found ❌";
+        noResults.style.display = "block";
+      } else {
+        noResults.style.display = "none";
+
+        resultsDiv.innerHTML = data.map(s => `
+          <div class="vendor-card" onclick="openStore(${s.id})">
+            <img src="${s.image}" alt="${s.name}">
+            <div class="info">
+              <h3>${s.name}</h3>
+              <p>${s.location || "Beqaa"}</p>
+              ${s.is_open ? `<span class="open-badge">Open</span>` : `<span class="closed-badge">Closed</span>`}
+            </div>
+          </div>
+        `).join("");
+      }
+
+    } catch (err) {
+      console.error(err);
+      resultsDiv.innerHTML = "<p>⚠️ Failed to fetch results.</p>";
+    }
+  }
+
+  function openStore(id) {
+    window.location.href = `/store/${id}`;
+  }
+</script>
+
 </body>
 </html>

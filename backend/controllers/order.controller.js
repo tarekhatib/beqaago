@@ -1,21 +1,30 @@
 import db from "../config/db.js";
+import {
+  updateOrderStatus,
+  getUserOrdersFromDb,
+  getVendorOrdersFromDb,
+  getShopStatsFromDb,
+  getRecentOrdersFromDb
+} from "../models/order.model.js";
 
-// GET /api/orders/user/:userId  → for user "My Orders" page
+// USER – orders
 export const getUserOrders = async (req, res) => {
   try {
     const userId = req.params.userId;
 
     const [rows] = await db.query(
-      `SELECT 
-         o.id,
-         o.total,
-         o.status,
-         o.created_at,
-         v.name AS restaurant
-       FROM orders o
-       JOIN vendors v ON o.vendor_id = v.id
-       WHERE o.user_id = ?
-       ORDER BY o.created_at DESC`,
+      `
+      SELECT 
+        o.id,
+        o.total,
+        o.status,
+        o.created_at,
+        s.name AS shop_name
+      FROM orders o
+      JOIN shops s ON o.shop_id = s.id
+      WHERE o.user_id = ?
+      ORDER BY o.created_at DESC
+      `,
       [userId]
     );
 
@@ -26,60 +35,76 @@ export const getUserOrders = async (req, res) => {
   }
 };
 
-// POST /api/orders  → when user checks out
-export const addOrder = async (req, res) => {
+
+// CREATE ORDER + AUTO UPDATE (Pending → Preparing → Delivered)
+export const createOrder = async (req, res) => {
   try {
-    const { user_id, vendor_id, total } = req.body;
+    const { user_id, shop_id, total } = req.body;
 
-    if (!user_id || !vendor_id || !total)
-      return res.status(400).json({ message: "Missing required fields" });
+    if (!user_id || !shop_id || !total) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
 
-    await db.query(
-      "INSERT INTO orders (user_id, vendor_id, total) VALUES (?, ?, ?)",
-      [user_id, vendor_id, total]
+    const [result] = await db.query(
+      `INSERT INTO orders (user_id, shop_id, total, status)
+       VALUES (?, ?, ?, 'Pending')`,
+      [user_id, shop_id, total]
     );
 
-    res.status(201).json({ message: "Order placed successfully ✅" });
+    const orderId = result.insertId;
+
+    // After 1 minute → Preparing
+    setTimeout(async () => {
+      await updateOrderStatus(orderId, "Preparing");
+      console.log(`Order ${orderId} → Preparing`);
+    }, 60 * 1000);
+
+    // After 2 minutes → Delivered
+    setTimeout(async () => {
+      await updateOrderStatus(orderId, "Delivered");
+      console.log(`Order ${orderId} → Delivered`);
+    }, 120 * 1000);
+
+    res.status(201).json({ message: "Order created", orderId });
+
   } catch (err) {
-    console.error("❌ Error inserting order:", err.message);
+    console.error("❌ createOrder:", err);
     res.status(500).json({ message: "Database error" });
   }
 };
 
-// GET /api/orders/vendor/:vendorId  → vendor dashboard
+// VENDOR – orders (for one vendor's shops)
 export const getVendorOrders = async (req, res) => {
   try {
-    const vendorId = req.params.vendorId;
-
-    const [orders] = await db.query(
-      `SELECT 
-         o.id,
-         o.total,
-         o.status,
-         o.created_at,
-         u.name AS customer
-       FROM orders o
-       JOIN users u ON o.user_id = u.id
-       WHERE o.vendor_id = ?
-       ORDER BY o.created_at DESC`,
-      [vendorId]
-    );
-
-    const [todayRows] = await db.query(
-      `SELECT COUNT(*) AS today
-       FROM orders
-       WHERE vendor_id = ?
-       AND DATE(created_at) = CURDATE()`,
-      [vendorId]
-    );
-
-    res.json({
-      total: orders.length,
-      today: todayRows[0]?.today || 0,
-      orders,
-    });
+    const vendorUserId = req.params.vendorUserId;
+    const rows = await getVendorOrdersFromDb(vendorUserId);
+    res.json(rows);
   } catch (err) {
-    console.error("❌ Error fetching vendor orders:", err.message);
-    res.status(500).json({ message: "Failed to fetch vendor orders" });
+    console.error("❌ getVendorOrders:", err);
+    res.status(500).json({ message: "Database error" });
+  }
+};
+
+// VENDOR – shop stats
+export const getShopOrderStats = async (req, res) => {
+  try {
+    const shopId = req.params.shopId;
+    const stats = await getShopStatsFromDb(shopId);
+    res.json(stats);
+  } catch (err) {
+    console.error("❌ getShopOrderStats:", err);
+    res.status(500).json({ message: "Database error" });
+  }
+};
+
+// VENDOR – recent orders for one shop
+export const getRecentOrdersForShop = async (req, res) => {
+  try {
+    const shopId = req.params.shopId;
+    const rows = await getRecentOrdersFromDb(shopId);
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ getRecentOrdersForShop:", err);
+    res.status(500).json({ message: "Database error" });
   }
 };

@@ -1,17 +1,25 @@
 import express from "express";
 import {
   getUserOrders,
-  addOrder,
   getVendorOrders,
+  createOrder,
+  getShopOrderStats,
+  getRecentOrdersForShop
 } from "../controllers/order.controller.js";
 
 const router = express.Router();
 
-// user side
-router.get("/user/:userId", getUserOrders);
-router.post("/", addOrder);
+// Vendor Full Orders List
+router.get("/vendor/:vendorUserId", getVendorOrders);
 
-// vendor side
-router.get("/vendor/:vendorId", getVendorOrders);
+// Vendor Stats & Recent Orders
+router.get("/stats/:shopId", getShopOrderStats);
+router.get("/recent/:shopId", getRecentOrdersForShop);
+
+// User Orders
+router.get("/:userId", getUserOrders);
+
+// Create order
+router.post("/", createOrder);
 
 export default router;

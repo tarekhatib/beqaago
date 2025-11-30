@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Create Shop | BeqaaGo</title>
+  <link rel="stylesheet" href="/styles/vendor.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+
+<div class="vendor-container">
+
+  <aside class="sidebar">
+    <h2 class="brand">BeqaaGo Vendor</h2>
+    <nav>
+      <a href="/vendor/dashboard"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+      <a href="/vendor/menu"><i class="fa-solid fa-utensils"></i> Menu Items</a>
+      <a href="/vendor/orders"><i class="fa-solid fa-clipboard-list"></i> Orders</a>
+      <a href="/vendor/settings"><i class="fa-solid fa-gear"></i> Settings</a>
+      <a href="#" onclick="vendorLogout()" class="logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <h1>Create Your Shop</h1>
+
+    <p>You need to create your shop before adding items or receiving orders.</p>
+
+    <form id="create-form" class="vendor-form">
+      <input type="text" id="name" placeholder="Shop Name" required />
+      <input type="text" id="type" placeholder="Type (Restaurant, Shop...)" />
+      <input type="text" id="location" placeholder="Location" required />
+      <input type="text" id="phone" placeholder="Phone" required />
+      <input type="text" id="image" placeholder="Image URL" required />
+      <button type="submit">Create Shop</button>
+      <p id="create-msg" style="margin-top:8px;font-size:0.9rem;"></p>
+    </form>
+  </main>
+
+</div>
+
+<script>
+function vendorLogout() {
+  localStorage.removeItem("user");
+  localStorage.removeItem("token");
+  window.location.href = "/login";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("create-form");
+  const msg = document.getElementById("create-msg");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const vendor = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!vendor.id || vendor.role !== "vendor") {
+      return window.location.href = "/login";
+    }
+
+    const name = document.getElementById("name").value.trim();
+    const type = (document.getElementById("type").value.trim() || "restaurant").toLowerCase();
+    const location = document.getElementById("location").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    const image = document.getElementById("image").value.trim();
+
+    if (!name || !location || !phone || !image) {
+      msg.style.color = "red";
+      msg.textContent = "All fields are required.";
+      return;
+    }
+
+    const res = await fetch(`/api/shops/owner/${vendor.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, type, location, phone, image })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      msg.style.color = "#00b050";
+      msg.textContent = "Shop created! Redirecting...";
+      setTimeout(() => window.location.href = "/vendor/dashboard", 1000);
+    } else {
+      msg.style.color = "red";
+      msg.textContent = data.message || "Failed to create shop.";
+    }
+  });
+});
+</script>
+
+</body>
+</html>
