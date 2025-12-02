@@ -130,3 +130,45 @@ VALUES(
     'Bar Elias, Beqaa',
     '/images/vendors/manoushe.jpg'
   );
+ALTER TABLE users
+ADD COLUMN role ENUM('user', 'vendor') DEFAULT 'user';
+-- SHOPS (one per vendor)
+DROP TABLE IF EXISTS shops;
+CREATE TABLE shops (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  -- owner (vendor, from users.id)
+  name VARCHAR(100) NOT NULL,
+  type ENUM('restaurant', 'shop', 'market', 'other') DEFAULT 'restaurant',
+  phone VARCHAR(20),
+  location VARCHAR(100),
+  image VARCHAR(255) DEFAULT '/images/vendor.jpg',
+  is_open TINYINT(1) DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+-- ITEMS (menu / products for a shop)
+DROP TABLE IF EXISTS shop_items;
+CREATE TABLE shop_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  shop_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  description VARCHAR(255),
+  price DECIMAL(10, 2) NOT NULL,
+  image VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (shop_id) REFERENCES shops(id)
+);
+-- ORDERS
+DROP TABLE IF EXISTS orders;
+CREATE TABLE orders (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  shop_id INT NOT NULL,
+  total DECIMAL(10, 2) NOT NULL,
+  status ENUM('Pending', 'Preparing', 'Delivered') DEFAULT 'Pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (shop_id) REFERENCES shops(id)
+);

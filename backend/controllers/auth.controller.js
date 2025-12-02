@@ -44,50 +44,48 @@ export const register = async (req, res) => {
   }
 };
 
-// LOGIN
+// SESSION LOGIN
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Email and password required" });
-    }
 
     const [rows] = await db.query(
       "SELECT * FROM users WHERE email = ?",
       [email]
     );
 
-    if (rows.length === 0) {
+    if (rows.length === 0)
       return res.status(401).json({ message: "Invalid credentials" });
-    }
 
     const user = rows[0];
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match)
       return res.status(401).json({ message: "Invalid credentials" });
-    }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+    // --- SAVE USER IN SESSION ---
+    req.session.user = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
 
-    res.json({
-      message: "Login successful ✅",
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+    return res.json({
+      message: "Login successful (session active)",
+      user: req.session.user,
     });
+
   } catch (err) {
-    console.error("❌ Login error:", err.message);
+    console.log("Login error:", err.message);
     res.status(500).json({ message: "Server error" });
   }
+};
+
+export const logout = (req, res) => {
+  req.session.destroy(err => {
+    if (err) console.error(err);
+    res.clearCookie("user_session");
+    return res.redirect("/login");
+  });
 };

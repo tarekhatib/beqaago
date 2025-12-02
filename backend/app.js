@@ -4,6 +4,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import session from "express-session";
+import MySQLStoreFactory from "express-mysql-session";
+import dbOptions from "./config/sessionDB.js";
 
 // Models
 import { getShopById } from "./models/shop.model.js";
@@ -103,6 +106,30 @@ app.get("/vendor/settings", (req, res) =>
 app.get("/vendor/create-shop", (req, res) =>
   res.render("vendor/create-shop", { page: "vendor-create-shop" })
 );
+
+const MySQLStore = MySQLStoreFactory(session);
+
+// create a session store connected to MySQL
+const sessionStore = new MySQLStore(dbOptions);
+
+app.use(
+  session({
+    key: "user_session",
+    secret: process.env.SESSION_SECRET || "fallback-secret-key",
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
+    }
+  })
+);
+
+// Make session user available to all EJS views
+app.use((req, res, next) => {
+  res.locals.user = req.session.user || null;
+  next();
+});
 
 // ============================
 // API ROUTES
