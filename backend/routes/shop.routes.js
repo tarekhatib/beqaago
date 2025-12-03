@@ -14,24 +14,24 @@ import {
 
 const router = express.Router();
 
-/* -------- SEARCH (put first) -------- */
+/* SEARCH */
 router.get("/search", searchShopsHandler);
 
-/* -------- PUBLIC USER ROUTES -------- */
-router.get("/", listShops);
-router.get("/:id", getShop);
-router.get("/:id/items", getShopItems);
-
-/* -------- VENDOR ROUTES -------- */
+/* VENDOR ROUTES */
 router.get("/owner/:userId", getShopByOwner);
 router.post("/owner/:userId", createShopForOwner);
 router.put("/owner/:userId", updateShopInfo);
 router.put("/owner/:userId/availability", updateAvailability);
 
-// Toggle open/close by shop id (for dashboard switch)
+/* OPEN/CLOSE */
 router.patch("/status/:id", setShopStatus);
 
-// Vendor adds item
+/* PUBLIC ROUTES (⭐ ORDER MATTERS!) */
+router.get("/:id/items", getShopItems);  // MUST be BEFORE getShop
+router.get("/:id", getShop);             // LAST dynamic route
+router.get("/", listShops);
+
+/* ADD ITEM */
 router.post("/:id/items", addItemToShop);
 
-export default router;
+export default router;

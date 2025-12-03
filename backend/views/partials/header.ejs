@@ -12,5 +12,15 @@
   <i class="fa-solid fa-cart-shopping"></i>
   <span class="badge" id="cart-count">0</span>
 </div>
+<script>
+  function updateCartCount() {
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const badge = document.getElementById("cart-count");
+    if (badge) badge.innerText = cart.length;
+  }
+
+  document.addEventListener("DOMContentLoaded", updateCartCount);
+</script>
+
 
 </header>

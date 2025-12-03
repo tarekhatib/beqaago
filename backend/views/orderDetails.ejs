@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Order #<%= order.id %> | BeqaaGo</title>
+
+  <link rel="stylesheet" href="/styles/dashboard.css">
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+  <%- include("partials/header") %>
+
+  <main class="order-details-page">
+
+    <h1>Order Details</h1>
+
+    <!-- ORDER HEADER -->
+    <div class="order-header">
+      <p><strong>Order Number:</strong> #<%= order.user_order_number %></p>
+      <p><strong>Date:</strong> <%= order.created_at %></p>
+      <p>
+        <strong>Status:</strong>
+        <% if (order.status === "Pending") { %>
+          <span class="status pending">Pending</span>
+        <% } else if (order.status === "Preparing") { %>
+          <span class="status preparing">Preparing</span>
+        <% } else if (order.status === "On the way") { %>
+          <span class="status delivery">On the way</span>
+        <% } else { %>
+          <span class="status done">Delivered</span>
+        <% } %>
+      </p>
+    </div>
+
+    <!-- SHOP INFO -->
+    <div class="shop-box">
+      <img src="<%= shop.image %>" class="shop-img" />
+      <div>
+        <h2><%= shop.name %></h2>
+        <p><i class="fa-solid fa-location-dot"></i> <%= shop.location %></p>
+        <p><i class="fa-solid fa-phone"></i> <%= shop.phone %></p>
+      </div>
+    </div>
+
+    <h3>Items</h3>
+
+    <!-- ITEM LIST -->
+    <div class="order-items">
+      <% items.forEach(item => { %>
+        <div class="order-item">
+          <div class="left">
+            <h4><%= item.name %></h4>
+            <p class="qty">Qty: <%= item.quantity %></p>
+          </div>
+          <div class="price">
+            $<%= (item.price * item.quantity).toFixed(2) %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+    <!-- SUMMARY -->
+    <h3>Summary</h3>
+
+    <div class="summary-box">
+      <div class="row">
+        <span>Items Total</span>
+        <span>$<%= totals.itemsTotal.toFixed(2) %></span>
+      </div>
+
+      <div class="row">
+        <span>Delivery Fee</span>
+        <% if (totals.deliveryFee === 0) { %>
+          <span>Free</span>
+        <% } else { %>
+          <span>$<%= totals.deliveryFee.toFixed(2) %></span>
+        <% } %>
+      </div>
+
+      <hr>
+
+      <div class="row total">
+        <span>Total</span>
+        <span>$<%= totals.finalTotal.toFixed(2) %></span>
+      </div>
+    </div>
+
+    <a href="/orders" class="back-btn">
+      <i class="fa-solid fa-arrow-left"></i> Back to Orders
+    </a>
+
+  </main>
+
+  <%- include("partials/footer") %>
+
+<style>
+  .order-details-page {
+    padding-bottom: 60px;
+  }
+
+  .order-header {
+    background: #fff;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    margin-bottom: 15px;
+  }
+  .order-details-page {
+  padding: 20px;
+  padding-bottom: 120px !important; /* space for footer */
+}
+
+
+  .status {
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: white;
+  }
+  .pending { background: #f39c12; }
+  .preparing { background: #2980b9; }
+  .delivery { background: #8e44ad; }
+  .done { background: #27ae60; }
+
+  .shop-box {
+    display: flex;
+    gap: 15px;
+    background: #fff;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  }
+
+  .shop-img {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    object-fit: cover;
+  }
+
+  .order-items {
+    margin-bottom: 20px;
+  }
+
+  .order-item {
+    display: flex;
+    justify-content: space-between;
+    background: #fff;
+    padding: 12px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+
+  .order-item .qty {
+    color: #666;
+    font-size: 14px;
+  }
+
+  .price {
+    font-weight: 600;
+    color: #00b050;
+  }
+
+  .summary-box {
+    background: #fff;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  }
+
+  .summary-box .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 15px;
+  }
+
+  .summary-box .total {
+    font-size: 17px;
+    font-weight: bold;
+  }
+
+  .back-btn {
+    display: inline-block;
+    margin-top: 20px;
+    color: #333;
+    font-size: 15px;
+    text-decoration: none;
+  }
+</style>
+
+</body>
+</html>

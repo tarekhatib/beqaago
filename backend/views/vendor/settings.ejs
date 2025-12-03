@@ -16,25 +16,11 @@
     <h2 class="brand">BeqaaGo Vendor</h2>
 
     <nav>
-      <a href="/vendor/dashboard">
-        <i class="fa-solid fa-chart-line"></i> Dashboard
-      </a>
-
-      <a href="/vendor/menu">
-        <i class="fa-solid fa-utensils"></i> Menu Items
-      </a>
-
-      <a href="/vendor/orders">
-        <i class="fa-solid fa-clipboard-list"></i> Orders
-      </a>
-
-      <a href="/vendor/settings" class="active">
-        <i class="fa-solid fa-gear"></i> Settings
-      </a>
-
-      <a class="logout" onclick="vendorLogout()">
-        <i class="fa-solid fa-right-from-bracket"></i> Logout
-      </a>
+      <a href="/vendor/dashboard"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+      <a href="/vendor/menu"><i class="fa-solid fa-utensils"></i> Menu Items</a>
+      <a href="/vendor/orders"><i class="fa-solid fa-clipboard-list"></i> Orders</a>
+      <a href="/vendor/settings" class="active"><i class="fa-solid fa-gear"></i> Settings</a>
+      <a class="logout" onclick="vendorLogout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
     </nav>
   </aside>
 
@@ -46,13 +32,22 @@
       <h2>Shop Information</h2>
 
       <form id="shop-form">
+
         <input type="text" id="shop-name" placeholder="Shop Name" required>
-        <input type="text" id="shop-type" placeholder="Type (restaurant, shop...)" required>
+
+        <select id="shop-category" required>
+          <option value="">Loading categories...</option>
+        </select>
+
+        <input type="number" step="0.01" id="shop-fee" placeholder="Delivery Fee ($)" required>
+
         <input type="text" id="shop-phone" placeholder="Phone" required>
         <input type="text" id="shop-location" placeholder="Location" required>
         <input type="text" id="shop-image" placeholder="Image URL" required>
+
         <button type="submit">Save Shop</button>
         <p id="shop-save-msg" style="margin-top:8px;font-size:0.9rem;color:#00b050;"></p>
+
       </form>
     </section>
 
@@ -63,6 +58,7 @@
         <input type="checkbox" id="availability-toggle">
         <span class="slider"></span>
       </label>
+
       <p id="avail-text" style="margin-top:8px;font-weight:600;"></p>
       <p id="avail-save-msg" style="margin-top:4px;font-size:0.9rem;color:#00b050;"></p>
     </section>
@@ -99,9 +95,14 @@ async function initSettings() {
     return (window.location.href = "/login");
   }
 
+  // Load vendor account info
   document.getElementById("vendor-name").value = vendor.name || "";
   document.getElementById("vendor-email").value = vendor.email || "";
 
+  // Load categories
+  await loadCategories();
+
+  // Load shop info
   const res = await fetch(`/api/shops/owner/${vendor.id}`);
   const shop = await res.json();
 
@@ -109,15 +110,17 @@ async function initSettings() {
     return (window.location.href = "/vendor/create-shop");
   }
 
-  document.getElementById("shop-name").value     = shop.name        || "";
-  document.getElementById("shop-type").value     = shop.type        || "restaurant";
-  document.getElementById("shop-phone").value    = shop.phone       || "";
-  document.getElementById("shop-location").value = shop.location    || "";
-  document.getElementById("shop-image").value    = shop.image       || "";
+  document.getElementById("shop-name").value  = shop.name;
+  document.getElementById("shop-category").value = shop.category_id;
+  document.getElementById("shop-fee").value = shop.delivery_fee;
+  document.getElementById("shop-phone").value = shop.phone;
+  document.getElementById("shop-location").value = shop.location;
+  document.getElementById("shop-image").value = shop.image;
+
   document.getElementById("availability-toggle").checked = shop.is_open == 1;
   document.getElementById("avail-text").innerText = shop.is_open ? "Open" : "Closed";
 
-  // Availability
+  // Availability logic
   document.getElementById("availability-toggle").addEventListener("change", async (e) => {
     const is_open = e.target.checked ? 1 : 0;
 
@@ -128,9 +131,10 @@ async function initSettings() {
         body: JSON.stringify({ is_open })
       });
 
-      if (!res.ok) throw new Error("Failed to update availability");
+      if (!res.ok) throw new Error("Failed");
 
       document.getElementById("avail-text").innerText = is_open ? "Open" : "Closed";
+
       const msg = document.getElementById("avail-save-msg");
       msg.textContent = "Availability updated";
       setTimeout(() => (msg.textContent = ""), 1500);
@@ -146,22 +150,23 @@ async function initSettings() {
   document.getElementById("shop-form").addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const name     = document.getElementById("shop-name").value.trim();
-    const type     = document.getElementById("shop-type").value.trim();
-    const phone    = document.getElementById("shop-phone").value.trim();
-    const location = document.getElementById("shop-location").value.trim();
-    const image    = document.getElementById("shop-image").value.trim();
-
-    if (!name || !type || !phone || !location || !image) return;
+    const updated = {
+      name: document.getElementById("shop-name").value.trim(),
+      category_id: document.getElementById("shop-category").value,
+      delivery_fee: document.getElementById("shop-fee").value,
+      phone: document.getElementById("shop-phone").value.trim(),
+      location: document.getElementById("shop-location").value.trim(),
+      image: document.getElementById("shop-image").value.trim(),
+    };
 
     try {
       const res = await fetch(`/api/shops/owner/${vendor.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, type, phone, location, image })
+        body: JSON.stringify(updated)
       });
 
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res.ok) throw new Error("Failed");
 
       const msg = document.getElementById("shop-save-msg");
       msg.textContent = "Shop saved!";
@@ -174,12 +179,70 @@ async function initSettings() {
   });
 
   // Account form (UI only)
-  document.getElementById("account-form").addEventListener("submit", (e) => {
+   // Account form – REAL update
+  document.getElementById("account-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const msg = document.getElementById("account-msg");
-    msg.textContent = "Account update endpoint not implemented.";
-    setTimeout(() => (msg.textContent = ""), 2000);
+
+    const newName = document.getElementById("vendor-name").value.trim();
+    const newEmail = document.getElementById("vendor-email").value.trim();
+    const newPassword = document.getElementById("vendor-pass").value.trim();
+
+    const msgEl = document.getElementById("account-msg");
+
+    // simple validation
+    if (!newName || !newEmail) {
+      msgEl.textContent = "Name and email are required.";
+      setTimeout(() => (msgEl.textContent = ""), 2000);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/users/${vendor.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName,
+          email: newEmail,
+          password: newPassword || undefined   // empty → ignored by controller
+        })
+      });
+
+      const data = await res.json();
+      msgEl.textContent = data.message || "Updated.";
+
+      if (res.ok) {
+        // update localStorage so it stays in sync
+        vendor.name = newName;
+        vendor.email = newEmail;
+        localStorage.setItem("user", JSON.stringify(vendor));
+
+        // clear password field only
+        document.getElementById("vendor-pass").value = "";
+      }
+
+      setTimeout(() => (msgEl.textContent = ""), 2000);
+    } catch (err) {
+      console.error("Update account error:", err);
+      msgEl.textContent = "Failed to update account.";
+      setTimeout(() => (msgEl.textContent = ""), 2000);
+    }
   });
+}
+
+async function loadCategories() {
+  const select = document.getElementById("shop-category");
+
+  try {
+    const res = await fetch("/api/categories");
+    const cats = await res.json();
+
+    select.innerHTML = cats
+      .map((c) => `<option value="${c.id}">${c.name}</option>`)
+      .join("");
+
+  } catch (err) {
+    console.error("Failed to load categories", err);
+  }
 }
 </script>
 

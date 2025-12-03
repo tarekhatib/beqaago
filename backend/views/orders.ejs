@@ -52,38 +52,37 @@
   }
 
   function renderOrderCard(order) {
-    const statusColors = {
-      "Pending": "#ffcc00",
-      "Preparing": "#00b7ff",
-      "Delivered": "#00b050"
-    };
+  const statusColors = {
+    "Pending": "#ffcc00",
+    "Preparing": "#00b7ff",
+    "Delivered": "#00b050"
+  };
 
-    return `
-      <div class="order-card">
-        <div class="order-row">
-          <div>
-           <h3>Order #${order.id}</h3>
-<p>${order.shop_name}</p>
+  return `
+    <div class="order-card" onclick="window.location.href='/api/orders/details/${order.id}'">
 
-<p class="order-date">${new Date(order.created_at).toLocaleString()}</p>
-<p><strong>Total:</strong> $${order.total}</p>
-    <p><strong>Status:</strong> 
-              <span style="color:${statusColors[order.status]};font-weight:600;">
-                ${order.status}
-              </span>
-            </p>
-          </div>
-        </div>
+      <h3>Order #${order.user_order_number}</h3>
+      <p>${order.shop_name}</p>
 
-        <!-- Small progress bar -->
-        <div class="progress-container">
-          <div class="progress-bar" style="width:${getProgress(order.status)}%"></div>
-        </div>
+      <p class="order-date">${new Date(order.created_at).toLocaleString()}</p>
 
-        <p class="progress-label">${getProgressLabel(order.status)}</p>
+      <p><strong>Total:</strong> $${order.total}</p>
+
+      <p><strong>Status:</strong>
+        <span style="color:${statusColors[order.status]};font-weight:600;">
+          ${order.status}
+        </span>
+      </p>
+
+      <div class="progress-container">
+        <div class="progress-bar" style="width:${getProgress(order.status)}%"></div>
       </div>
-    `;
-  }
+
+      <p class="progress-label">${getProgressLabel(order.status)}</p>
+
+    </div>
+  `;
+}
 
   function getProgress(status) {
     if (status === "Pending") return 33;

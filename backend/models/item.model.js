@@ -19,3 +19,11 @@ export const createItemForShop = async (shopId, name, description, price, image)
 export const deleteItem = async (itemId) => {
   await db.query("DELETE FROM shop_items WHERE id = ?", [itemId]);
 };
+export const updateItemById = async (itemId, { name, description, price, image }) => {
+  await db.query(
+    `UPDATE shop_items
+     SET name=?, description=?, price=?, image=?
+     WHERE id = ?`,
+    [name, description, price, image, itemId]
+  );
+};

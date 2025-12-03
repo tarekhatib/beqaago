@@ -9,14 +9,15 @@ export const getUserOrdersFromDb = async (userId) => {
     `
     SELECT 
       o.id,
+      o.user_order_number,
       o.total,
       o.status,
       o.created_at,
-      s.name AS shop
+      s.name AS shop_name
     FROM orders o
     JOIN shops s ON o.shop_id = s.id
     WHERE o.user_id = ?
-    ORDER BY o.created_at DESC
+    ORDER BY o.user_order_number DESC
     `,
     [userId]
   );
@@ -27,17 +28,19 @@ export const getVendorOrdersFromDb = async (vendorUserId) => {
   const [rows] = await db.query(
     `
     SELECT 
-      o.id,
-      o.total,
-      o.status,
-      o.created_at,
-      u.name AS customer,
-      s.name AS shop
+  o.id,
+  o.vendor_order_number,
+  o.total,
+  o.status,
+  o.created_at,
+  u.name AS customer,
+  s.name AS shop
+
     FROM orders o
     JOIN shops s ON o.shop_id = s.id
     JOIN users u ON o.user_id = u.id
     WHERE s.user_id = ?
-    ORDER BY o.created_at DESC
+    ORDER BY o.vendor_order_number DESC
     `,
     [vendorUserId]
   );
@@ -64,7 +67,12 @@ export const getShopStatsFromDb = async (shopId) => {
 export const getRecentOrdersFromDb = async (shopId) => {
   const [rows] = await db.query(
     `
-    SELECT id, total, status, created_at
+    SELECT 
+      id, 
+      vendor_order_number,
+      total, 
+      status, 
+      created_at
     FROM orders
     WHERE shop_id = ?
     ORDER BY created_at DESC

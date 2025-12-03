@@ -20,34 +20,26 @@
       <a href="/vendor/dashboard" class="active">
         <i class="fa-solid fa-chart-line"></i> Dashboard
       </a>
-
-      <a href="/vendor/menu">
-        <i class="fa-solid fa-utensils"></i> Menu Items
-      </a>
-
-      <a href="/vendor/orders">
-        <i class="fa-solid fa-clipboard-list"></i> Orders
-      </a>
-
-      <a href="/vendor/settings">
-        <i class="fa-solid fa-gear"></i> Settings
-      </a>
-
+      <a href="/vendor/menu"><i class="fa-solid fa-utensils"></i> Menu Items</a>
+      <a href="/vendor/orders"><i class="fa-solid fa-clipboard-list"></i> Orders</a>
+      <a href="/vendor/settings"><i class="fa-solid fa-gear"></i> Settings</a>
       <a href="#" onclick="vendorLogout()" class="logout">
         <i class="fa-solid fa-right-from-bracket"></i> Logout
       </a>
     </nav>
   </aside>
 
-  <!-- MAIN CONTENT -->
+  <!-- MAIN -->
   <main class="main">
     <h1>Welcome, <span id="vendor-name"></span> 👋</h1>
 
+    <!-- SHOP INFO -->
     <section class="restaurant-info">
       <h2>Your Shop</h2>
-      <div id="shop-box">Loading...</div>
+      <div id="shop-box" class="shop-box">Loading...</div>
     </section>
 
+    <!-- STATS -->
     <div class="stats">
       <div class="stat-box">
         <h3>Today's Orders</h3>
@@ -69,6 +61,7 @@
       </div>
     </div>
 
+    <!-- RECENT ORDERS -->
     <section class="latest-orders">
       <h2>Recent Orders</h2>
       <div id="recent-box">Loading...</div>
@@ -77,114 +70,139 @@
         View all orders →
       </a>
     </section>
-
   </main>
 </div>
 
+
 <script>
-  function vendorLogout() {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    window.location.href = "/login";
+/* =====================
+      LOGOUT
+===================== */
+function vendorLogout() {
+  localStorage.removeItem("user");
+  localStorage.removeItem("token");
+  window.location.href = "/login";
+}
+
+/* =====================
+    DASHBOARD INIT
+===================== */
+document.addEventListener("DOMContentLoaded", initVendorDashboard);
+
+async function initVendorDashboard() {
+  const vendor = JSON.parse(localStorage.getItem("user") || "{}");
+
+  if (!vendor.id || vendor.role !== "vendor") {
+    return window.location.href = "/login";
   }
 
-  document.addEventListener("DOMContentLoaded", initVendorDashboard);
+  document.getElementById("vendor-name").innerText = vendor.name;
 
-  async function initVendorDashboard() {
-    const vendor = JSON.parse(localStorage.getItem("user") || "{}");
+  // LOAD SHOP
+  const res = await fetch(`/api/shops/owner/${vendor.id}`);
+  const shop = await res.json();
 
-    if (!vendor.id || vendor.role !== "vendor") {
-      return window.location.href = "/login";
-    }
+  if (!shop.id) return window.location.href = "/vendor/create-shop";
 
-    document.getElementById("vendor-name").innerText = vendor.name;
+  renderShopBox(shop);
 
-    // Get shop
-    const res = await fetch(`/api/shops/owner/${vendor.id}`);
-    const shop = await res.json();
+  setupAvailabilitySwitch(shop);
 
-    if (!shop.id) {
-      return window.location.href = "/vendor/create-shop";
-    }
+  loadStats(shop.id);
+  loadRecentOrders(shop.id);
+}
 
-    renderShopBox(shop);
+/* =====================
+       SHOP BOX
+===================== */
+function renderShopBox(shop) {
+  const todayStatus = shop.is_open ? 
+    `<span class="open-badge">OPEN</span>` :
+    `<span class="closed-badge">CLOSED</span>`;
 
-    // Availability switch
-    const availInput = document.getElementById("availability");
-    const statusLabel = document.getElementById("status-label");
-
-    availInput.checked = shop.is_open === 1;
-    statusLabel.innerText = shop.is_open ? "Online" : "Offline";
-
-    availInput.addEventListener("change", async () => {
-      const isOpen = availInput.checked ? 1 : 0;
-      statusLabel.innerText = isOpen ? "Online" : "Offline";
-
-      // Update by shop id (for dashboard)
-      await fetch(`/api/shops/status/${shop.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_open: isOpen })
-      });
-    });
-
-    // Stats + recent orders
-    loadStats(shop.id);
-    loadRecentOrders(shop.id);
-  }
-
-  function renderShopBox(shop) {
-    document.getElementById("shop-box").innerHTML = `
-      <div class="restaurant-card">
-        <img src="${shop.image}" alt="${shop.name}" class="restaurant-img">
-        <div>
-          <h3>${shop.name}</h3>
-          <p>${shop.location || ""}</p>
-          <p>${shop.phone || ""}</p>
-        </div>
+  document.getElementById("shop-box").innerHTML = `
+    <div class="restaurant-card">
+      <img src="${shop.image}" alt="${shop.name}" class="restaurant-img">
+      <div class="info">
+        <h3>${shop.name} ${todayStatus}</h3>
+        <p><strong>Category:</strong> ${shop.category_name}</p>
+        <p><strong>Delivery Fee:</strong> $${Number(shop.delivery_fee || 0).toFixed(2)}</p>
+        <p><strong>Location:</strong> ${shop.location}</p>
+        <p><strong>Phone:</strong> ${shop.phone}</p>
       </div>
-    `;
+    </div>
+  `;
+}
+
+/* =====================
+   AVAILABILITY SWITCH
+===================== */
+function setupAvailabilitySwitch(shop) {
+  const avail = document.getElementById("availability");
+  const label = document.getElementById("status-label");
+
+  avail.checked = shop.is_open === 1;
+  label.innerText = shop.is_open ? "Online" : "Offline";
+
+  avail.addEventListener("change", async () => {
+    const isOpen = avail.checked ? 1 : 0;
+    label.innerText = isOpen ? "Online" : "Offline";
+
+    await fetch(`/api/shops/status/${shop.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_open: isOpen })
+    });
+  });
+}
+
+/* =====================
+        STATS
+===================== */
+async function loadStats(shopId) {
+  try {
+    const res = await fetch(`/api/orders/stats/${shopId}`);
+    const stats = await res.json();
+
+    document.getElementById("today-orders").innerText = stats.today || 0;
+    document.getElementById("total-orders").innerText = stats.total || 0;
+
+  } catch (err) {
+    console.error("Stats error:", err);
   }
+}
 
-  async function loadStats(shopId) {
-    try {
-      const res = await fetch(`/api/orders/stats/${shopId}`);
-      const stats = await res.json();
+/* =====================
+    RECENT ORDERS
+===================== */
+async function loadRecentOrders(shopId) {
+  try {
+    const res = await fetch(`/api/orders/recent/${shopId}`);
+    const orders = await res.json();
+    const box = document.getElementById("recent-box");
 
-      document.getElementById("today-orders").innerText = stats.today || 0;
-      document.getElementById("total-orders").innerText = stats.total || 0;
-    } catch (err) {
-      console.error("Stats error:", err);
+    if (!orders.length) {
+      box.innerHTML = "<p>No recent orders.</p>";
+      return;
     }
+
+    box.innerHTML = orders.slice(0, 3)
+      .map(o => `
+        <div class="order-preview">
+         <strong>#${o.vendor_order_number}</strong>
+
+
+          <p>${o.status} • $${o.total}</p>
+          <p class="time">${new Date(o.created_at).toLocaleTimeString()}</p>
+        </div>
+      `)
+      .join("");
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById("recent-box").innerText = "Failed to load orders.";
   }
-
-  async function loadRecentOrders(shopId) {
-    try {
-      const res = await fetch(`/api/orders/recent/${shopId}`);
-      const orders = await res.json();
-      const box = document.getElementById("recent-box");
-
-      if (!orders.length) {
-        box.innerHTML = "<p>No recent orders.</p>";
-        return;
-      }
-
-      const latest = orders.slice(0, 3);
-
-      box.innerHTML = latest
-        .map(o => `
-          <div class="order-preview">
-            <strong>#${o.id}</strong>
-            <p>${o.status} • $${o.total}</p>
-            <p class="time">${new Date(o.created_at).toLocaleTimeString()}</p>
-          </div>
-        `)
-        .join("");
-    } catch (err) {
-      console.error(err);
-      document.getElementById("recent-box").innerText = "Failed to load orders.";
-    }
-  }
+}
 </script>
 
 </body>

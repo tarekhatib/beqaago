@@ -17,7 +17,15 @@
 
     <div class="cart-summary" id="cart-summary" style="display:none;">
       <p class="cart-restaurant" id="cart-restaurant"></p>
-      <p><strong>Total:</strong> $<span id="cart-total">0</span></p>
+
+      <p><strong>Items:</strong> $<span id="cart-items-subtotal">0.00</span></p>
+      <p>
+        <strong>Delivery:</strong>
+        <span id="cart-delivery">Calculating...</span>
+      </p>
+      <hr>
+      <p><strong>Total:</strong> $<span id="cart-total">0.00</span></p>
+
       <button id="checkout-btn">Place Order</button>
     </div>
   </main>
@@ -28,18 +36,31 @@
   <%- include("partials/footer") %>
 
 <script>
-  const cartList = document.getElementById("cart-items");
-  const emptyMsg = document.getElementById("cart-empty");
-  const summaryBox = document.getElementById("cart-summary");
-  const totalSpan = document.getElementById("cart-total");
-  const restaurantLabel = document.getElementById("cart-restaurant");
-  const toastEl = document.getElementById("toast");
+  const cartList         = document.getElementById("cart-items");
+  const emptyMsg         = document.getElementById("cart-empty");
+  const summaryBox       = document.getElementById("cart-summary");
+  const totalSpan        = document.getElementById("cart-total");
+  const itemsSubtotalEl  = document.getElementById("cart-items-subtotal");
+  const deliverySpan     = document.getElementById("cart-delivery");
+  const restaurantLabel  = document.getElementById("cart-restaurant");
+  const toastEl          = document.getElementById("toast");
 
   let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+  let user = JSON.parse(localStorage.getItem("user") || "{}");
+  let userOrderCount = 0;   // how many orders this user has already made
 
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
+    // Load how many orders this user already has (for free delivery rule)
+    if (user && user.id) {
+      userOrderCount = await getUserOrderCount(user.id);
+    }
     renderCart();
+    updateHeaderCartCount();
   });
+
+  /* ========================
+        HELPERS
+  ======================== */
 
   function saveCart() {
     localStorage.setItem("cart", JSON.stringify(cart));
@@ -63,11 +84,31 @@
     }, 2000);
   }
 
+  async function getUserOrderCount(userId) {
+    try {
+    const res = await fetch(`/api/orders/${userId}`);
+
+      if (!res.ok) return 0;
+      const orders = await res.json();
+      if (!Array.isArray(orders)) return 0;
+      return orders.length;
+    } catch (err) {
+      console.error("Failed to fetch user orders count:", err);
+      return 0;
+    }
+  }
+
+  /* ========================
+        RENDER CART
+  ======================== */
+
   function renderCart() {
     if (!cart.length) {
       cartList.innerHTML = "";
       emptyMsg.style.display = "block";
       summaryBox.style.display = "none";
+      itemsSubtotalEl.textContent = "0.00";
+      deliverySpan.textContent = "$0.00";
       totalSpan.textContent = "0.00";
       return;
     }
@@ -76,16 +117,16 @@
     summaryBox.style.display = "block";
 
     const shopName = cart[0].shopName || "This shop";
-restaurantLabel.textContent = "From: " + shopName;
+    restaurantLabel.textContent = "From: " + shopName;
 
-    let total = 0;
+    let itemsTotal = 0;
 
     cartList.innerHTML = cart
       .map((item, idx) => {
         const price = Number(item.price) || 0;
-        const qty = item.qty || 1;
+        const qty   = item.qty || 1;
         const lineTotal = price * qty;
-        total += lineTotal;
+        itemsTotal += lineTotal;
 
         return `
           <div class="cart-item" data-index="${idx}">
@@ -111,11 +152,30 @@ restaurantLabel.textContent = "From: " + shopName;
       })
       .join("");
 
-    totalSpan.textContent = total.toFixed(2);
+    // ✅ Delivery rule: first 3 orders for this user → FREE delivery
+    const isDeliveryFree = userOrderCount < 3;
+    const deliveryFeeRaw = Number(cart[0].delivery_fee || 0);
+    const deliveryFee    = isDeliveryFree ? 0 : deliveryFeeRaw;
+
+    itemsSubtotalEl.textContent = itemsTotal.toFixed(2);
+
+    if (isDeliveryFree) {
+      deliverySpan.textContent = "Free (first 3 orders)";
+    } else {
+      deliverySpan.textContent = "$" + deliveryFee.toFixed(2);
+    }
+
+    const grandTotal = itemsTotal + deliveryFee;
+    totalSpan.textContent = grandTotal.toFixed(2);
+
     saveCart();
   }
 
-  // Event delegation for + / - / remove
+  /* ========================
+       CART EVENTS
+  ======================== */
+
+  // + / - / remove
   cartList.addEventListener("click", (e) => {
     const itemEl = e.target.closest(".cart-item");
     if (!itemEl) return;
@@ -139,9 +199,13 @@ restaurantLabel.textContent = "From: " + shopName;
     }
   });
 
+  /* ========================
+          CHECKOUT
+  ======================== */
+
   async function checkout() {
     cart = JSON.parse(localStorage.getItem("cart") || "[]");
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    user = JSON.parse(localStorage.getItem("user") || "{}");
 
     if (!user.id) {
       showToast("Please log in first.");
@@ -153,27 +217,39 @@ restaurantLabel.textContent = "From: " + shopName;
       return;
     }
 
-    const total = cart.reduce(
+    // Recompute items total
+    const itemsTotal = cart.reduce(
       (sum, i) => sum + (Number(i.price) || 0) * (i.qty || 0),
       0
     );
-    const shopId = cart[0].shop_id;
+
+    // Make sure we have updated count (in case user placed orders in other tab)
+    const freshCount = await getUserOrderCount(user.id);
+    userOrderCount = freshCount;
+
+    const isDeliveryFree = userOrderCount < 3;
+    const deliveryFeeRaw = Number(cart[0].delivery_fee || 0);
+    const deliveryFee    = isDeliveryFree ? 0 : deliveryFeeRaw;
+
+    const finalTotal = itemsTotal + deliveryFee;
+    const shopId     = cart[0].shop_id;
 
     try {
-      
-
-const res = await fetch("/api/orders", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    user_id: user.id,
-    shop_id: shopId,
-    total,
-    status: "Pending",
-    items: cart,
-  }),
-});
-
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.id,
+          shop_id: shopId,
+          total: finalTotal,
+          status: "Pending",
+          items: cart.map(item => ({
+            item_id: item.id,
+            quantity: item.qty,
+            price: item.price      // unit price
+          }))
+        })
+      });
 
       const data = await res.json();
       if (res.ok) {
@@ -181,6 +257,7 @@ const res = await fetch("/api/orders", {
         cart = [];
         renderCart();
         showToast("Order placed!");
+
         setTimeout(() => {
           window.location.href = "/orders";
         }, 800);
@@ -294,7 +371,6 @@ const res = await fetch("/api/orders", {
     color: #777;
   }
 
-  /* Reuse toast styles from store page */
   .toast {
     position: fixed;
     left: 50%;

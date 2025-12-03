@@ -10,14 +10,18 @@
 <body>
 
   <%- include("partials/header") %>
-<script>
-  // Fix cart badge inside store page
-  document.addEventListener("DOMContentLoaded", () => {
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-    const badge = document.getElementById("cart-count");
-    if (badge) badge.textContent = cart.reduce((s,i)=>s+(i.qty||1),0);
-  });
-</script>
+
+  <!-- Sync cart badge when opening store page -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const cart  = JSON.parse(localStorage.getItem("cart") || "[]");
+      const badge = document.getElementById("cart-count");
+      if (badge) {
+        const qty = cart.reduce((s, i) => s + (i.qty || 1), 0);
+        badge.textContent = qty;
+      }
+    });
+  </script>
 
   <main class="store-page">
     <h1 class="store-title"><%= shopName %></h1>
@@ -52,14 +56,15 @@
 
   <%- include("partials/footer") %>
 
+  <!-- Globals from backend -->
   <script>
-    const shopId   = <%= shopId %>;
-    const isOpen   = <%= shopIsOpen %>;
-    const shopName = "<%= shopName %>";
+    const shopId          = <%= shopId %>;
+    const isOpen          = <%= shopIsOpen %>;
+    const shopName        = "<%= shopName %>";
+    const shopDeliveryFee = Number(<%= shopDeliveryFee || 0 %>);   // 🔥 delivery fee
   </script>
 
-<script>
-
+ <script>
   let cart = JSON.parse(localStorage.getItem("cart") || "[]");
   let pendingItem = null;
 
@@ -70,95 +75,99 @@
   const modal        = document.getElementById("cart-modal");
   const modalCancel  = document.getElementById("modal-cancel");
   const modalConfirm = document.getElementById("modal-confirm");
-function updateHeaderCartCount() {
-  const badge = document.getElementById("cart-count");
-  if (badge) {
-    const qty = cart.reduce((s, i) => s + (i.qty || 1), 0);
-    badge.textContent = qty;
-  }
-}
 
- document.addEventListener("DOMContentLoaded", () => {
-  loadMenu();
-  updateCartBar();
-  updateHeaderCartCount();   // 🔥 FIX
-
-  if (!isOpen) disableStoreActions();
-
-  modalCancel.addEventListener("click", hideModal);
-  modalConfirm.addEventListener("click", confirmSwitchCart);
-});
-
-
-  async function loadMenu() {
-    try {
-      const res = await fetch(`/api/shops/${shopId}/items`);
-      const items = await res.json();
-
-      if (!items.length) {
-        menuList.innerHTML = "<p>No items yet.</p>";
-        return;
-      }
-
-      menuList.innerHTML = items.map(i => `
-        <div class="menu-row">
-          <img 
-            src="${i.image || "/images/no-image.png"}"
-            class="item-img"
-            onerror="this.src='/images/no-image.png'"
-          />
-
-          <div class="item-info">
-            <h3>${i.name}</h3>
-            ${i.description ? `<p class="item-desc">${i.description}</p>` : ""}
-            <p class="price">$${Number(i.price).toFixed(2)}</p>
-          </div>
-
-          <button class="add-btn"
-            onclick='addToCart(${JSON.stringify({
-              id: i.id,
-              shop_id: shopId,
-              shopName: shopName,
-              name: i.name,
-              price: Number(i.price),
-              image: i.image
-            })})'>
-            Add
-          </button>
-        </div>
-      `).join("");
-
-    } catch(err) {
-      console.error(err);
-      menuList.innerHTML = "<p>Failed to load menu.</p>";
+  function updateHeaderCartCount() {
+    const badge = document.getElementById("cart-count");
+    if (badge) {
+      const qty = cart.reduce((s, i) => s + (i.qty || 1), 0);
+      badge.textContent = qty;
     }
   }
 
- function addToCart(item) {
-  if (!isOpen) return;
+  document.addEventListener("DOMContentLoaded", () => {
+    loadMenu();
+    updateCartBar();
+    updateHeaderCartCount();
 
-  // If switching shops
-  if (cart.length && cart[0].shop_id !== item.shop_id) {
-    pendingItem = item;
-    showModal();
-    return;
+    if (!isOpen) disableStoreActions();
+
+    modalCancel.addEventListener("click", hideModal);
+    modalConfirm.addEventListener("click", confirmSwitchCart);
+  });
+
+  /* ======================
+        LOAD MENU
+  ====================== */
+  async function loadMenu() {
+  try {
+    const res = await fetch(`/api/shops/${shopId}/items`);
+    const items = await res.json();
+
+    if (!items.length) {
+      menuList.innerHTML = "<p>No items yet.</p>";
+      return;
+    }
+
+    menuList.innerHTML = items.map(i => `
+      <div class="menu-row">
+        <img 
+          src="${i.image || "/images/no-image.png"}"
+          class="item-img"
+          onerror="this.src='/images/no-image.png'"
+        />
+
+        <div class="item-info">
+          <h3>${i.name}</h3>
+          ${i.description ? `<p class="item-desc">${i.description}</p>` : ""}
+          <p class="price">$${Number(i.price).toFixed(2)}</p>
+        </div>
+
+        <button class="add-btn"
+          onclick='addToCart(${JSON.stringify({
+            id: i.id,
+            shop_id: shopId,
+            shopName: shopName,
+            name: i.name,
+            price: Number(i.price),
+            image: i.image,
+            delivery_fee: shopDeliveryFee
+          })})'>
+          Add
+        </button>
+      </div>
+    `).join("");
+
+  } catch(err) {
+    console.error(err);
+    menuList.innerHTML = "<p>Failed to load menu.</p>";
   }
-
-  // ✅ check if item already exists
-  const existing = cart.find(i => i.id === item.id);
-
-  if (existing) {
-    existing.qty += 1;   // increase quantity
-  } else {
-    cart.push({ ...item, qty: 1 });
-  }
-
- saveCart();
-updateCartBar();
-updateHeaderCartCount();   // 🔥 KEY FIX
-showToast(`${item.name} added to cart`);
-
 }
+
+  /* ======================
+         ADD TO CART
+  ====================== */
+  function addToCart(item) {
+    if (!isOpen) return;
+
+    if (cart.length && cart[0].shop_id !== item.shop_id) {
+      pendingItem = item;
+      showModal();
+      return;
+    }
+
+    const existing = cart.find(i => i.id === item.id);
+
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      cart.push({ ...item, qty: 1 });
+    }
+
+    saveCart();
+    updateCartBar();
+    updateHeaderCartCount();
+    showToast(`${item.name} added to cart`);
+  }
 
   function confirmSwitchCart() {
     cart = [{ ...pendingItem, qty: 1 }];
@@ -173,8 +182,14 @@ showToast(`${item.name} added to cart`);
     localStorage.setItem("cart", JSON.stringify(cart));
   }
 
+  /* ======================
+        CART BAR
+  ====================== */
   function updateCartBar() {
-    if (!cart.length) return cartBar.classList.add("hidden");
+    if (!cart.length) {
+      cartBar.classList.add("hidden");
+      return;
+    }
 
     const qty   = cart.reduce((s, i) => s + (i.qty || 1), 0);
     const total = cart.reduce((s, i) => s + (i.qty || 1) * Number(i.price), 0);
@@ -187,10 +202,12 @@ showToast(`${item.name} added to cart`);
     window.location.href = "/cart";
   }
 
+  /* ======================
+      MODAL + TOAST
+  ====================== */
   function showModal() {
     modal.classList.remove("hidden");
   }
-
   function hideModal() {
     modal.classList.add("hidden");
   }
@@ -206,6 +223,9 @@ showToast(`${item.name} added to cart`);
     }, 1400);
   }
 
+  /* ======================
+     CLOSED STORE STATE
+  ====================== */
   function disableStoreActions() {
     const banner = document.createElement("div");
     banner.className = "closed-banner";

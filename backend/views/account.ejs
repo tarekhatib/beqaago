@@ -89,6 +89,14 @@ function logout() {
   alert("👋 Logged out successfully!");
   window.location.href = "/login";
 }
+</script><script>
+  function updateCartCount() {
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const badge = document.getElementById("cart-count");
+    if (badge) badge.innerText = cart.length;
+  }
+
+  document.addEventListener("DOMContentLoaded", updateCartCount);
 </script>
 
 </body>

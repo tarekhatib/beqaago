@@ -2,10 +2,9 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import db from "../config/db.js";
 
-// REGISTER (user or vendor)
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body; // role: 'user' or 'vendor'
+    const { name, email, password, role } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
@@ -15,13 +14,14 @@ export const register = async (req, res) => {
       "SELECT id FROM users WHERE email = ?",
       [email]
     );
+
     if (existing.length) {
       return res.status(409).json({ message: "Email already registered" });
     }
 
     const hashed = await bcrypt.hash(password, 10);
 
-    // Insert in users
+    // Insert into USERS only (NO vendors table)
     const [result] = await db.query(
       "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
       [name, email, hashed, role === "vendor" ? "vendor" : "user"]
@@ -29,18 +29,14 @@ export const register = async (req, res) => {
 
     const userId = result.insertId;
 
-    // If vendor → create linked row in vendors table (same id)
-    if (role === "vendor") {
-      await db.query(
-        "INSERT INTO vendors (id, name, email) VALUES (?, ?, ?)",
-        [userId, name, email]
-      );
-    }
+    return res.status(201).json({
+      message: "User registered successfully",
+      userId
+    });
 
-    res.status(201).json({ message: "User registered successfully ✅" });
   } catch (err) {
-    console.error("❌ Registration error:", err.message);
-    res.status(500).json({ message: "Registration failed" });
+    console.error("❌ Registration error:", err); // full error now
+    return res.status(500).json({ message: "Registration failed" });
   }
 };
 

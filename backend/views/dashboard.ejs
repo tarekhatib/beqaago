@@ -42,16 +42,18 @@
       <h3>🎉 Free Delivery</h3>
       <p>On your first 3 orders</p>
     </div>
-    <img src="/images/promo.avif" alt="Promo">
+    <img src="/images/icons/freedelivery.png" alt="Promo">
   </div>
 
   <!-- CATEGORIES -->
   <section class="categories">
     <div class="cat active"><img src="/images/icons/all.png"><p>All</p></div>
-    <div class="cat"><img src="/images/icons/food.jpg"><p>Food</p></div>
-    <div class="cat"><img src="/images/icons/fresh.webp"><p>Fresh</p></div>
-    <div class="cat"><img src="/images/icons/skincare.avif"><p>Beauty</p></div>
-    <div class="cat"><img src="/images/icons/shop.jpg"><p>Shops</p></div>
+<div class="cat"><img src="/images/icons/food.jpg"><p>Food</p></div>
+<div class="cat"><img src="/images/icons/fresh.webp"><p>Fresh</p></div>
+<div class="cat"><img src="/images/icons/skincare.avif"><p>Beauty</p></div>
+<div class="cat"><img src="/images/icons/pharmacy.png"><p>Pharmacy</p></div>
+<div class="cat"><img src="/images/icons/shop.jpg"><p>Supermarket</p></div>
+
   </section>
 
   <!-- SHOPS -->
@@ -83,6 +85,24 @@
       grid.innerHTML = "<p>⚠️ Failed to load shops.</p>";
     }
   }
+document.getElementById("search").addEventListener("input", async (e) => {
+  const q = e.target.value.trim();
+
+  // If empty → show all shops
+  if (q === "") {
+    renderShops(allShops);
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/shops/search?q=${encodeURIComponent(q)}`);
+    const results = await res.json();
+
+    renderShops(results);
+  } catch (err) {
+    console.error("Search error:", err);
+  }
+});
 
   function renderShops(list) {
     const grid = document.getElementById("shop-grid");
@@ -124,21 +144,31 @@
     });
   }
 
-  function filterShops(category) {
-    if (category === "All") return renderShops(allShops);
+ function filterShops(category) {
 
-    if (category === "Food")
-      return renderShops(allShops.filter(s => s.type === "restaurant"));
-
-    if (category === "Fresh")
-      return renderShops(allShops.filter(s => s.type === "fresh"));
-
-    if (category === "Beauty")
-      return renderShops(allShops.filter(s => s.type === "beauty"));
-
-    if (category === "Shops")
-      return renderShops(allShops.filter(s => s.type === "shop" || s.type === "market"));
+  if (category === "All") {
+    return renderShops(allShops);
   }
+
+  const map = {
+    "Food": 2,
+    "Fresh": 3,
+    "Beauty": 4,
+    "Pharmacy": 5,
+    "Supermarket": 6
+  };
+
+  const categoryId = map[category];
+
+  if (!categoryId) {
+    // fallback (should never happen)
+    return renderShops(allShops);
+  }
+
+  const filtered = allShops.filter(s => s.category_id === categoryId);
+  return renderShops(filtered);
+}
+
 
   function openStore(id) {
     window.location.href = `/store/${id}`;

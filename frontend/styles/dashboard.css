@@ -2,7 +2,8 @@ body {
   margin: 0;
   background: #fffdf9;
   font-family: 'Poppins', sans-serif;
-   overflow-y: auto;    /* ✅ allow vertical scroll */
+   height: auto !important;
+   overflow-y: auto  !important  ; /* ✅ allow vertical scroll */
   overflow-x: hidden;
   color: #333;
 }

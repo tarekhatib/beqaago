@@ -35,6 +35,7 @@
         <input type="password" placeholder="Confirm Password" required />
         <button type="submit" class="btn-register">Register</button>
       </form>
+      <p id="register-msg" class="status-msg"></p>
 
       <p class="login-text">
         Already have an account?
@@ -52,63 +53,77 @@
       }, 600);
     });
   </script>
+<script>
+document.querySelector(".register-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-  <script>
-    document.querySelector(".register-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
+  const msg = document.getElementById("register-msg");
+  msg.textContent = "";
+  msg.className = "status-msg";
 
-      document.querySelectorAll(".error-message").forEach(msg => msg.remove());
-      document.querySelectorAll("input").forEach(input => input.classList.remove("input-error"));
+  // Reset error states
+  document.querySelectorAll(".error-message").forEach(m => m.remove());
+  document.querySelectorAll("input").forEach(i => i.classList.remove("input-error"));
 
-      const name = e.target[0].value.trim();
-      const email = e.target[1].value.trim();
-      const password = e.target[2].value;
-      const confirm = e.target[3].value;
-      const role = document.querySelector("input[name='role']:checked").value;
+  const name = e.target[0].value.trim();
+  const email = e.target[1].value.trim();
+  const password = e.target[2].value;
+  const confirm = e.target[3].value;
+  const role = document.querySelector("input[name='role']:checked").value;
 
-      let valid = true;
+  let valid = true;
 
-      const showError = (input, message) => {
-        input.classList.add("input-error");
-        const msg = document.createElement("div");
-        msg.classList.add("error-message");
-        msg.textContent = message;
-        input.insertAdjacentElement("afterend", msg);
-        valid = false;
-      };
+  const showError = (input, text) => {
+    input.classList.add("input-error");
+    const err = document.createElement("div");
+    err.classList.add("error-message");
+    err.textContent = text;
+    input.insertAdjacentElement("afterend", err);
+    valid = false;
+  };
 
-      if (!name) showError(e.target[0], "Full name is required");
+  // Validation
+  if (!name) showError(e.target[0], "Full name is required");
 
-      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-      if (!email) showError(e.target[1], "Email is required");
-      else if (!emailRegex.test(email)) showError(e.target[1], "Enter a valid email address");
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email) showError(e.target[1], "Email is required");
+  else if (!emailRegex.test(email)) showError(e.target[1], "Invalid email address");
 
-      if (!password) showError(e.target[2], "Password is required");
-      else if (password.length < 8) showError(e.target[2], "Password must be at least 8 characters");
+  if (!password) showError(e.target[2], "Password is required");
+  else if (password.length < 8) showError(e.target[2], "Min 8 characters");
 
-      if (confirm !== password) showError(e.target[3], "Passwords do not match");
-      if (!valid) return;
+  if (confirm !== password) showError(e.target[3], "Passwords do not match");
 
-      try {
-        const response = await fetch("/api/auth/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, password, role })
-        });
+  if (!valid) return;
 
-        const data = await response.json();
-
-        if (response.ok) {
-          alert("✅ Registration successful!");
-          window.location.href = "/login";
-        } else {
-          showError(e.target[1], data.message || "Registration failed");
-        }
-      } catch (err) {
-        console.error(err);
-        alert("⚠️ Server error — please try again later.");
-      }
+  try {
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, role }),
     });
-  </script>
+
+    const data = await response.json();
+
+    if (response.ok) {
+      msg.textContent = "Account created! Redirecting to login...";
+      msg.classList.add("status-success");
+
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 700);
+    } 
+    else {
+      msg.textContent = data.message || "Registration failed";
+      msg.classList.add("status-error");
+    }
+
+  } catch (err) {
+    msg.textContent = "Server error — try again later.";
+    msg.classList.add("status-error");
+  }
+});
+</script>
+
 </body>
 </html>
